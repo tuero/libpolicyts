@@ -16,12 +16,16 @@
 #include <libpolicyts/train_bootstrap.h>
 
 // Environment headers
+#ifdef LIBPTS_ENVS_FOUND
 #include <libpolicyts/env/boulderdash.h>
 #include <libpolicyts/env/craftworld.h>
+#include <libpolicyts/env/env_loader.h>
 #include <libpolicyts/env/sokoban.h>
 #include <libpolicyts/env/tsp.h>
+#endif
 
 // Torch dependent headers
+#ifdef LIBPTS_TORCH_FOUND
 #include <libpolicyts/model/base_model_wrapper.h>
 #include <libpolicyts/model/detail/heuristic_convnet.h>
 #include <libpolicyts/model/detail/layers.h>
@@ -32,3 +36,4 @@
 #include <libpolicyts/model/torch_init.h>
 #include <libpolicyts/model/torch_util.h>
 #include <libpolicyts/model/twoheaded_convnet_wrapper.h>
+#endif

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.0.1 LANGUAGES CXX)
+project(libpolicyts VERSION 1.0.2 LANGUAGES CXX)
 
 
 # Build options
@@ -58,6 +58,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     # Environment headers
     include/libpolicyts/env/boulderdash.h
     include/libpolicyts/env/craftworld.h
+    include/libpolicyts/env/env_loader.h
     include/libpolicyts/env/sokoban.h
     include/libpolicyts/env/tsp.h
     # Headers which depend on libtorch
