@@ -38,7 +38,7 @@ concept IsTSPStateImpl = std::is_same_v<T, tsp::TSPGameState> || std::is_same_v<
 template <IsTSPStateImpl T, StaticString name_str>
 class TSPStateImpl {
 public:
-    inline static const std::string name{name_str.data};
+    inline static const std::string name{name_str.data.data(), name_str.data.size() - 1};
     inline static const int num_actions = 4;
 
     explicit TSPStateImpl(const std::string &board_str)

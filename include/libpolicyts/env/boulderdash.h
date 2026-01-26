@@ -37,21 +37,21 @@ namespace libpts::env {
 //     kRewardWalkThroughGateBlue = 1 << 12,
 //     kRewardWalkThroughGateGreen = 1 << 13,
 //     kRewardWalkThroughGateYellow = 1 << 14,
-using BoulderdashEvent = boulderdash::RewardCodes;
+using BoulderDashEvent = boulderdash::RewardCodes;
 
-class BoulderdashState {
+class BoulderDashState {
 public:
     inline static const std::string name{"boulderdash"};
     inline static const int num_actions = 4;
 
-    explicit BoulderdashState(const std::string &board_str)
+    explicit BoulderDashState(const std::string &board_str)
         : state(board_str) {}
-    ~BoulderdashState() = default;
+    ~BoulderDashState() = default;
 
-    BoulderdashState(const BoulderdashState &) noexcept = default;
-    BoulderdashState(BoulderdashState &&) noexcept = default;
-    auto operator=(const BoulderdashState &) noexcept -> BoulderdashState & = default;
-    auto operator=(BoulderdashState &&) noexcept -> BoulderdashState & = default;
+    BoulderDashState(const BoulderDashState &) noexcept = default;
+    BoulderDashState(BoulderDashState &&) noexcept = default;
+    auto operator=(const BoulderDashState &) noexcept -> BoulderDashState & = default;
+    auto operator=(BoulderDashState &&) noexcept -> BoulderDashState & = default;
 
     // Apply the action and return step cost
     auto apply_action(int action) -> double {
@@ -104,7 +104,7 @@ public:
     }
 
     // State equality
-    [[nodiscard]] auto operator==(const BoulderdashState &rhs) const -> bool {
+    [[nodiscard]] auto operator==(const BoulderDashState &rhs) const -> bool {
         return state == rhs.state;
     }
 
@@ -114,11 +114,11 @@ public:
         return (reward_signal & events_mask) > 0;
     }
 
-    friend auto operator<<(std::ostream &os, const BoulderdashState &s) -> std::ostream & {
+    friend auto operator<<(std::ostream &os, const BoulderDashState &s) -> std::ostream & {
         return os << s.state;
     }
 
-    friend struct std::formatter<BoulderdashState>;
+    friend struct std::formatter<BoulderDashState>;
 
 private:
     boulderdash::BoulderDashGameState state;
@@ -129,15 +129,15 @@ private:
 
 // Hash and format support
 template <>
-struct std::hash<libpts::env::BoulderdashState> {
-    size_t operator()(const libpts::env::BoulderdashState &state) const {
+struct std::hash<libpts::env::BoulderDashState> {
+    size_t operator()(const libpts::env::BoulderDashState &state) const {
         return state.get_hash();
     }
 };
 
 template <>
-struct std::formatter<libpts::env::BoulderdashState> : std::formatter<std::string> {
-    auto format(libpts::env::BoulderdashState s, format_context &ctx) const {
+struct std::formatter<libpts::env::BoulderDashState> : std::formatter<std::string> {
+    auto format(libpts::env::BoulderDashState s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };
