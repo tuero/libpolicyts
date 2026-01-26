@@ -114,6 +114,30 @@ enum class BootstrapPolicy {
     LTS_CM = 1     // Uses modfied version using X% percentage of progress
 };
 
+// External flags -> enum support
+inline auto AbslParseFlag(absl::string_view text, BootstrapPolicy *mode, std::string *error) -> bool {
+    if (text == "double") {
+        *mode = BootstrapPolicy::DOUBLE;
+        return true;
+    }
+    if (text == "lts_cm") {
+        *mode = BootstrapPolicy::LTS_CM;
+        return true;
+    }
+    *error = "unknown value for enumeration";
+    return false;
+}
+
+inline auto AbslUnparseFlag(BootstrapPolicy mode) -> std::string {
+    switch (mode) {
+    case BootstrapPolicy::DOUBLE:
+        return "double";
+    case BootstrapPolicy::LTS_CM:
+        return "lts_cm";
+    }
+    return absl::StrCat(mode);
+}
+
 constexpr double default_bootstrap_factor = 0.1;
 
 template <
