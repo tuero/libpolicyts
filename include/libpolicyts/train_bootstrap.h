@@ -13,6 +13,7 @@
 #include <libpolicyts/thread_pool.h>
 #include <libpolicyts/timer.h>
 
+#include <absl/flags/flag.h>
 #include <absl/strings/str_cat.h>
 #include <spdlog/spdlog.h>
 
@@ -448,7 +449,7 @@ void train_bootstrap(
             bool flag1 = (solved_set_train.size() - prev_n_solved_train) > (bootstrap_factor * problems_train.size());
             // Current iteration solves 1.X more than previous iteration
             bool flag2 = curr_n_solved_train > ((1 + bootstrap_factor) * static_cast<double>(prev_n_solved_train));
-            if (!flag1 && !flag2 && n_outstanding_train > 0) {
+            if (!(flag1 && flag2) && n_outstanding_train > 0) {
                 search_budget =
                     2 * search_budget
                     + solved_expansions
