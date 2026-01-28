@@ -136,15 +136,17 @@ void test_runner(
                         }
                     }();
                     metrics_tracker.add_row(
-                        {bootstrap_iter,
-                         result.puzzle_name,
-                         result.solution_found,
-                         result.solution_cost,
-                         solution_prob,
-                         result.num_expanded,
-                         result.num_generated,
-                         result.time,
-                         search_budget}
+                        ProblemMetrics{
+                        .iter = bootstrap_iter,
+                        .puzzle_name = result.puzzle_name,
+                        .solution_found = result.solution_found,
+                        .solution_cost = result.solution_cost,
+                        .solution_prob = solution_prob,
+                        .expanded = result.num_expanded,
+                        .generated = result.num_generated,
+                        .time = result.time,
+                        .budget = search_budget
+                        }
                     );
                 } else {
                     metrics_tracker.add_row_by_result(result, bootstrap_iter, search_budget);

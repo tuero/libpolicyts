@@ -23,7 +23,6 @@ struct ProblemMetrics {
     bool solution_found;
     double solution_cost;
     double solution_prob;
-    double solution_prob_raw;
     int expanded;
     int generated;
     double time;

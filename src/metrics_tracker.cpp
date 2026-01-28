@@ -9,21 +9,20 @@
 namespace libpts {
 
 void ProblemMetrics::dump_header(std::ostream &os) {
-    os << "iter,puzzle_name,solution_found,solution_cost,solution_prob,solution_prob_raw,expanded,generated,"
+    os << "iter,puzzle_name,solution_found,solution_cost,solution_prob,expanded,generated,"
           "time,budget\n";
 }
 
 auto operator<<(std::ostream &os, const ProblemMetrics &metrics_item) -> std::ostream & {
     os << metrics_item.iter << "," << metrics_item.puzzle_name << "," << metrics_item.solution_found << ","
-       << metrics_item.solution_cost << "," << metrics_item.solution_prob << "," << metrics_item.solution_prob_raw
-       << "," << metrics_item.expanded << "," << metrics_item.generated << "," << metrics_item.time << ","
-       << metrics_item.budget << "\n";
+       << metrics_item.solution_cost << "," << metrics_item.solution_prob << "," << metrics_item.expanded << ","
+       << metrics_item.generated << "," << metrics_item.time << "," << metrics_item.budget << "\n";
     return os;
 }
 auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics {
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     // NOLINTBEGIN (*-magic-numbers)
-    if (strs.size() != 10) {
+    if (strs.size() != 9) {
         SPDLOG_ERROR("Error reading line {:s}, {:d}", str, strs.size());
         throw std::runtime_error("line does not contain valid data for this metric");
     }
@@ -33,11 +32,10 @@ auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics {
         .solution_found = static_cast<bool>(std::stoi(strs[2])),
         .solution_cost = std::stod(strs[3]),
         .solution_prob = std::stod(strs[4]),
-        .solution_prob_raw = std::stod(strs[5]),
-        .expanded = std::stoi(strs[6]),
-        .generated = std::stoi(strs[7]),
-        .time = std::stod(strs[8]),
-        .budget = std::stoi(strs[9]),
+        .expanded = std::stoi(strs[5]),
+        .generated = std::stoi(strs[6]),
+        .time = std::stod(strs[7]),
+        .budget = std::stoi(strs[8]),
     };
     // NOLINTEND
 }
