@@ -1,5 +1,7 @@
 #include <libpolicyts/algorithm/bfs.h>
 #include <libpolicyts/algorithm/levints.h>
+#include <libpolicyts/algorithm/lubyts.h>
+#include <libpolicyts/algorithm/multits.h>
 #include <libpolicyts/algorithm/phs.h>
 #include <libpolicyts/block_allocator.h>
 #include <libpolicyts/concepts.h>

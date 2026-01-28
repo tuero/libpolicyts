@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.0.5 LANGUAGES CXX)
+project(libpolicyts VERSION 1.1.0 LANGUAGES CXX)
 
 
 # Build options
@@ -38,7 +38,10 @@ endif()
 set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/algorithm/bfs.h
     include/libpolicyts/algorithm/levints.h
+    include/libpolicyts/algorithm/lubyts.h
+    include/libpolicyts/algorithm/multits.h
     include/libpolicyts/algorithm/phs.h
+    include/libpolicyts/algorithm/detail/luby_impl.h
     include/libpolicyts/algorithm/detail/phs_impl.h
     include/libpolicyts/block_allocator.h
     include/libpolicyts/concepts.h

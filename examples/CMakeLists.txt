@@ -1,3 +1,5 @@
 add_subdirectory(bfs)
 add_subdirectory(levints)
+add_subdirectory(lubyts)
+add_subdirectory(multits)
 add_subdirectory(phs)
