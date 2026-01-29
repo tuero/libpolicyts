@@ -6,6 +6,8 @@ A C++23 library for policy tree search algorithms and auxiliary utilities.
 The following algorithms are implemented in `include/libpolicyts/algorithm/`, 
 which support both user-defined policy/heuristics and neural network defined versions.
 - __Best First Search__: A general search algorithm with controlled weights on the g-cost and h-cost
+- __LubyTS__: Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
+- __MultiTS__: Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
 - __LevinTS__: Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
 - __PHS*__: Orseau, Laurent, and Levi HS Lelis. "Policy-guided heuristic search with guarantees." Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 35. No. 14. 2021.
 

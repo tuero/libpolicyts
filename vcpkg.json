@@ -3,9 +3,11 @@
     "abseil",
     "boulderdash",
     "craftworld",
+    "igraph",
     "nlohmann-json",
+    "sokoban",
     "spdlog",
     "tsp",
-    "sokoban"
+    "libleidenalg"
   ]
 }

@@ -2,6 +2,7 @@ target_include_directories(libpolicyts PRIVATE ${PROJECT_SOURCE_DIR}/src)
 
 target_sources(libpolicyts
     PRIVATE 
+        cluster_graph.cpp
         logging.cpp
         math_util.cpp
         metrics_tracker.cpp

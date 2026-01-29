@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.1.0 LANGUAGES CXX)
+project(libpolicyts VERSION 1.1.1 LANGUAGES CXX)
 
 
 # Build options
@@ -44,6 +44,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/algorithm/detail/luby_impl.h
     include/libpolicyts/algorithm/detail/phs_impl.h
     include/libpolicyts/block_allocator.h
+    include/libpolicyts/cluster_graph.h
     include/libpolicyts/concepts.h
     include/libpolicyts/libpolicyts.h
     include/libpolicyts/logging.h
@@ -76,12 +77,18 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/model/torch_util.h
     include/libpolicyts/model/twoheaded_convnet_wrapper.h
 )
+# Suppress preprocessor #warning diagnostics for this one TU
+set_source_files_properties(src/cluster_graph.cpp APPEND PROPERTIES
+  COMPILE_OPTIONS "-Wno-cpp"
+)
 
 
 # External libs from 
 find_package(absl CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(igraph CONFIG REQUIRED)
+find_package(libleidenalg CONFIG REQUIRED)
 
 
 # Link external libs
@@ -96,6 +103,8 @@ target_link_libraries(libpolicyts PUBLIC
     absl::flags_parse
 )
 target_link_libraries(libpolicyts PUBLIC nlohmann_json::nlohmann_json)
+target_link_libraries(libpolicyts PUBLIC igraph::igraph)
+target_link_libraries(libpolicyts PUBLIC libleidenalg::libleidenalg)
 
 
 if (LIBPOLICYTS_BUILD_EXAMPLES)

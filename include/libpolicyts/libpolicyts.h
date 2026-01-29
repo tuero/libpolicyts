@@ -4,6 +4,7 @@
 #include <libpolicyts/algorithm/multits.h>
 #include <libpolicyts/algorithm/phs.h>
 #include <libpolicyts/block_allocator.h>
+#include <libpolicyts/cluster_graph.h>
 #include <libpolicyts/concepts.h>
 #include <libpolicyts/logging.h>
 #include <libpolicyts/math_util.h>
