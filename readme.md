@@ -1,7 +1,14 @@
 # libpolicyts
 
 A C++23 library for policy tree search algorithms and auxiliary utilities.
+The design goal is to make it easy to use different environments and models (single functors or complex neural networks) for each implemented algorithm.
+
 Usage implementations of training and testing neural policies/heuristics for these algorithms are in the companion project [policyts](https://github.com/tuero/policyts), which uses this library as a dependency for the algorithm implementation and neural networks.
+
+> Why implement all this in C++?
+
+Speed matters, especially when running search over complex environment domains.
+Even with neural policies/heuristics being used to query for each generated node, you can often see ~2x speedups by keeping the search in the C++ runtime rather than writing your search algorithms in Python.
 
 ## Implemented Algorithms
 The following algorithms are implemented in `include/libpolicyts/algorithm/`, 
