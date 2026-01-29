@@ -1,6 +1,7 @@
 # libpolicyts
 
 A C++23 library for policy tree search algorithms and auxiliary utilities.
+Usage implementations of training and testing neural policies/heuristics for these algorithms are in the companion project [policyts](https://github.com/tuero/policyts), which uses this library as a dependency for the algorithm implementation and neural networks.
 
 ## Implemented Algorithms
 The following algorithms are implemented in `include/libpolicyts/algorithm/`, 
@@ -44,7 +45,7 @@ The following CMake flags are supported:
 
 ## Examples
 - Simple examples using both custom and libtorch neural moddesl are given in `examples/`.
-- TODO: Add more examples using the neural models + training/testing functionality
+- [policyts](https://github.com/tuero/policyts): Training and testing usage of algorithms and models in this library.
 
 
 ## Include to Your Project: CMake
