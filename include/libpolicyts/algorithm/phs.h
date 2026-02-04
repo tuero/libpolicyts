@@ -44,7 +44,7 @@ auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
     step_phs.init();
     timer.start();
     // Iteratively search until status changes (solved or timeout)
-    while (step_phs.get_status() == Status::OK && !input.stop_token->stop_requested()) {
+    while (step_phs.get_status() == Status::OK && (!input.stop_token || !input.stop_token->stop_requested())) {
         step_phs.step();
     }
     auto output = step_phs.get_search_output();

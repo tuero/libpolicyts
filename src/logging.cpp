@@ -42,7 +42,11 @@ void log_flags(int argc, char **argv) {
 }
 
 void log_flush() {
-    spdlog::get("name")->flush();
+    auto logger = spdlog::get("name");
+    if (!logger) {
+        return;
+    }
+    logger->flush();
 }
 
 void close_loggers() {

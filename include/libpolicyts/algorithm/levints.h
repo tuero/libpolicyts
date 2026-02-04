@@ -43,7 +43,7 @@ auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
     step_lts.init();
     timer.start();
     // Iteratively search until status changes (solved or timeout)
-    while (step_lts.get_status() == Status::OK && !input.stop_token->stop_requested()) {
+    while (step_lts.get_status() == Status::OK && (!input.stop_token || !input.stop_token->stop_requested())) {
         step_lts.step();
     }
     auto output = step_lts.get_search_output();

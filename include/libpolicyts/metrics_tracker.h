@@ -80,7 +80,9 @@ public:
                 }
                 export_file.close();
             }
-            std::filesystem::remove(full_path);
+            if (!resume) {
+                std::filesystem::remove(full_path);
+            }
         }
         std::filesystem::create_directories(export_path);
         save_header();

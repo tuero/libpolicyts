@@ -5,7 +5,6 @@
 #define LIBPTS_THREAD_POOL_H_
 
 #include <functional>
-#include <map>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -45,6 +44,10 @@ public:
             std::queue<QueueItemInput> empty;
             std::swap(queue_input_, empty);
         }
+        {
+            std::queue<QueueItemOutput> empty;
+            std::swap(queue_output_, empty);
+        }
         for (auto const &job : inputs) {
             queue_input_.emplace(job, ++id);
         }
@@ -63,16 +66,20 @@ public:
         threads_.clear();
 
         // Compile results, such that the id is in order to match passed order
-        std::vector<OutputT> results;
-        results.reserve(inputs.size());
-        std::map<int, OutputT> result_map;
+        std::vector<std::optional<OutputT>> result_slots(inputs.size());
         while (!queue_output_.empty()) {
             const auto result = queue_output_.front();
             queue_output_.pop();
-            result_map.emplace(result.id, std::move(result.output));
+            if (result.id >= 0 && static_cast<std::size_t>(result.id) < result_slots.size()) {
+                result_slots[static_cast<std::size_t>(result.id)] = std::move(result.output);
+            }
         }
-        for (auto const &result : result_map) {
-            results.push_back(std::move(result.second));
+        std::vector<OutputT> results;
+        results.reserve(inputs.size());
+        for (auto &result : result_slots) {
+            if (result) {
+                results.push_back(std::move(*result));
+            }
         }
 
         return results;
@@ -88,7 +95,7 @@ public:
     [[nodiscard]] auto
         run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs, std::size_t workers) noexcept
         -> std::vector<OutputT> {
-        std::size_t old_count = workers;
+        std::size_t old_count = num_threads_;
         num_threads_ = workers;
         const auto results = run(func, inputs);
         num_threads_ = old_count;

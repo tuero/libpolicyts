@@ -103,6 +103,8 @@ struct SearchOutput {
 
 constexpr double EPS = 1e-8;
 constexpr int BLOCK_ALLOCATION_SIZE = 2000;
+constexpr int INVALID_ACTION = -1;
+constexpr double DEFAULT_COST = 0.0;
 
 // Node used in search
 template <IsEnv EnvT>
@@ -154,9 +156,9 @@ struct Node {
     double log_p = 0;                            // Log path probability from root to this
     double g = 0;                                // Path cost from root to this
     mutable double h = 0;                        // Heuristic value from this to a goal node
-    mutable double cost = 0;                     // LTS/PHS cost
+    mutable double cost = DEFAULT_COST;          // LTS/PHS cost
     const Node *parent = nullptr;                // Parent node
-    int action = -1;                             // Action taken from parent
+    int action = INVALID_ACTION;                 // Action taken from parent
     mutable std::vector<double> log_policy{};    // Local log policy over child actions
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
@@ -200,6 +202,7 @@ public:
         }
         NodeT root_node(input.state);
         const auto root_node_ptr = node_allocator.add(root_node);
+        generated_nodes.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
         status = Status::OK;
@@ -317,6 +320,15 @@ private:
         }
 
         auto predictions = model->inference(inference_inputs);
+        if (predictions.size() != inference_nodes.size()) [[unlikely]] {
+            spdlog::error(
+                "Inference returned {} predictions for {} inputs.",
+                predictions.size(),
+                inference_nodes.size()
+            );
+            status = Status::ERROR;
+            return;
+        }
         for (auto &&[child_node, prediction] : std::views::zip(inference_nodes, predictions)) {
             if constexpr (HasHeuristic<decltype(prediction)>) {
                 child_node->h = std::max(prediction.heuristic, 0.0);
@@ -327,7 +339,11 @@ private:
                     prediction.policy.size(),
                     EnvT::num_actions
                 );
-                input.stop_token->stop();
+                if (input.stop_token) {
+                    input.stop_token->stop();
+                }
+                status = Status::ERROR;
+                return;
             }
             child_node->log_policy = std::move(prediction.policy);
             log_policy_noise(child_node->log_policy, input.mix_epsilon);

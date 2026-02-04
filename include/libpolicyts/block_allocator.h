@@ -92,6 +92,10 @@ private:
                 blocks_.push_back(std::vector<T>(allocate_increment_));
             }
         } else {
+            if (!default_item_) {
+                SPDLOG_ERROR("default_item must be set for non-default-constructible T");
+                std::exit(1);
+            }
             blocks_.push_back(std::vector<T>(static_cast<std::size_t>(allocate_increment_), default_item_.value()));
         }
         idx_ = -1;

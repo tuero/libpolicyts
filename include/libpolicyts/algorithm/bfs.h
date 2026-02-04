@@ -76,6 +76,9 @@ struct SearchOutput {
 };
 
 constexpr int BLOCK_ALLOCATION_SIZE = 2000;
+constexpr int INVALID_ACTION = -1;
+constexpr double DEFAULT_HEURISTIC = 0.0;
+constexpr double DEFAULT_COST = 0.0;
 
 // Node used in search
 template <IsEnv EnvT>
@@ -122,12 +125,12 @@ struct Node {
     };
 
     // NOLINTBEGIN (misc-non-private-member-variables-in-classes)
-    EnvT state;                      // State the node represents
-    double g = 0;                    // Path cost from root to this
-    mutable double h = 0;            // Heuristic value from this to a goal node
-    mutable double cost = 0;         // BFS cost being g*weight_g + h*weight_h
-    const Node *parent = nullptr;    // Parent node
-    int action = -1;                 // Action taken from parent
+    EnvT state;                              // State the node represents
+    double g = 0;                            // Path cost from root to this
+    mutable double h = DEFAULT_HEURISTIC;    // Heuristic value from this to a goal node
+    mutable double cost = DEFAULT_COST;      // BFS cost being g*weight_g + h*weight_h
+    const Node *parent = nullptr;            // Parent node
+    int action = INVALID_ACTION;             // Action taken from parent
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 
@@ -164,6 +167,7 @@ public:
         }
         NodeT root_node(input.state);
         const auto root_node_ptr = node_allocator.add(root_node);
+        generated_nodes.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
         status = Status::OK;
@@ -281,6 +285,15 @@ private:
         }
 
         auto predictions = model->inference(inference_inputs);
+        if (predictions.size() != inference_nodes.size()) [[unlikely]] {
+            spdlog::error(
+                "Inference returned {} predictions for {} inputs.",
+                predictions.size(),
+                inference_nodes.size()
+            );
+            status = Status::ERROR;
+            return;
+        }
         for (auto &&[child_node, prediction] : std::views::zip(inference_nodes, predictions)) {
             child_node->h = std::max(prediction.heuristic, 0.0);
             child_node->cost = (input.weight_g * child_node->g) + (input.weight_h * child_node->h);
@@ -329,7 +342,7 @@ auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
     step_bfs.init();
     timer.start();
     // Iteratively search until status changes (solved or timeout)
-    while (step_bfs.get_status() == Status::OK && !input.stop_token->stop_requested()) {
+    while (step_bfs.get_status() == Status::OK && (!input.stop_token || !input.stop_token->stop_requested())) {
         step_bfs.step();
     }
     auto output = step_bfs.get_search_output();
