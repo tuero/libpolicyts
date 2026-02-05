@@ -49,11 +49,21 @@ concept IsTestOutput = requires(T t, const T ct) {
 };
 
 // Concept for custom Problem Metrics
-// It must be an child template of MetricsTracker<>,
 template <typename T, typename SearchOutput>
-concept IsValidTracker = requires(T t, const T ct, const SearchOutput &output, int bootstrap_iter, int search_budget) {
-    []<typename MetricsItem>(MetricsTracker<MetricsItem> &) {}(t);
-    { t.add_row_by_result(output, bootstrap_iter, search_budget) };
+concept IsValidTracker = requires(
+    T t,
+    const T ct,
+    const SearchOutput &output,
+    const std::string &export_path,
+    const std::string &file_name,
+    bool resume,
+    int bootstrap_iter,
+    int search_budget
+) {
+    { T(export_path, file_name) };                                     // Constructable with path/file name
+    { T(export_path, file_name, resume) };                             // and optional resume
+    { t.add_row_by_result(output, bootstrap_iter, search_budget) };    // add output to rows
+    { t.save() };                                                      // save
 };
 
 template <

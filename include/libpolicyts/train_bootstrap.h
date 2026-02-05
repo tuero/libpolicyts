@@ -102,12 +102,33 @@ concept IsLearningHandler = requires(
 };
 
 // Concept for custom Problem Metrics
-// It must be an child template of MetricsTracker<>,
-// and add rows of data through add_row_by_result()
+namespace detail {
+template <typename T>
+concept HasResumeMetrics = requires(T t) {
+    { t.puzzle_name } -> std::same_as<std::string &>;
+    { t.solution_found } -> std::same_as<bool &>;
+    { t.expanded } -> std::same_as<int &>;
+};
+}    // namespace detail
 template <typename T, typename SearchOutput>
-concept IsValidTracker = requires(T t, const T ct, const SearchOutput &output, int bootstrap_iter, int search_budget) {
-    []<typename MetricsItem>(MetricsTracker<MetricsItem> &) {}(t);
-    { t.add_row_by_result(output, bootstrap_iter, search_budget) };
+concept IsValidTracker = requires(
+    T t,
+    const T ct,
+    const SearchOutput &output,
+    const std::string &export_path,
+    const std::string &file_name,
+    bool resume,
+    int bootstrap_iter,
+    int search_budget
+) {
+    { T(export_path, file_name) };                                     // Constructable with path/file name
+    { T(export_path, file_name, resume) };                             // and optional resume
+    { t.add_row_by_result(output, bootstrap_iter, search_budget) };    // add output to rows
+    { t.save() };                                                      // save
+    // .get_rows() returns a vector
+    requires IsSpecialization<std::remove_cvref_t<decltype(t.get_rows())>, std::vector>;
+    // Each item as at least a solution_found, puzzle_name, budget, and expanded field
+    requires detail::HasResumeMetrics<typename std::remove_cvref_t<decltype(t.get_rows())>::value_type>;
 };
 
 enum class BootstrapPolicy {
@@ -195,18 +216,18 @@ void train_bootstrap(
     int bootstrap_to_skip = 0;
     int batch_to_skip = 0;
     if (resume) {
-        for (const auto &row : metrics_tracker_train.rows) {
+        for (const auto &row : metrics_tracker_train.get_rows()) {
             if (row.solution_found) {
                 solved_set_train.insert(row.puzzle_name);
             }
             search_budget = row.budget;
             total_expansions += row.expanded;
         }
-        bootstrap_to_skip = metrics_tracker_train.rows.size() / problems_train.size();
-        batch_to_skip = (static_cast<int>(metrics_tracker_train.rows.size())
+        bootstrap_to_skip = metrics_tracker_train.size() / problems_train.size();
+        batch_to_skip = (static_cast<int>(metrics_tracker_train.size())
                          - (bootstrap_to_skip * static_cast<int>(problems_train.size())))
                         / num_problems_per_batch;
-        for (const auto &row : metrics_tracker_validate.rows) {
+        for (const auto &row : metrics_tracker_validate.get_rows()) {
             if (row.solution_found) {
                 solved_set_validate.insert(row.puzzle_name);
             }

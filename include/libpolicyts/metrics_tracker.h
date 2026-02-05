@@ -117,10 +117,17 @@ public:
         rows.clear();
     }
 
-    std::vector<MetricsItem> rows;
+    auto get_rows() -> const std::vector<MetricsItem> {
+        return rows;
+    }
+
+    auto size() -> int {
+        return static_cast<int>(rows.size());
+    }
 
 private:
     std::string full_path;
+    std::vector<MetricsItem> rows;
 };
 
 }    // namespace libpts
