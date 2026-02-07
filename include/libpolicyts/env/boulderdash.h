@@ -137,7 +137,7 @@ struct std::hash<libpts::env::BoulderDashState> {
 
 template <>
 struct std::formatter<libpts::env::BoulderDashState> : std::formatter<std::string> {
-    auto format(libpts::env::BoulderDashState s, format_context &ctx) const {
+    auto format(const libpts::env::BoulderDashState &s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };

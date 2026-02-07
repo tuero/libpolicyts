@@ -14,7 +14,7 @@
       "kind": "git",
       "repository": "https://github.com/tuero/vcpkg-registry",
       "reference": "master",
-      "baseline": "9f9dc3bd9416d4dd457afc63a1cbf2e97c7a9ea5",
+      "baseline": "4faed1fd965a6c7495162a0a9f4bc4f8ca9f9cb9",
       "packages": ["boulderdash", "craftworld", "sokoban", "tsp"]
     }
   ]

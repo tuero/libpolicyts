@@ -124,7 +124,7 @@ struct std::hash<libpts::env::SokobanState> {
 
 template <>
 struct std::formatter<libpts::env::SokobanState> : std::formatter<std::string> {
-    auto format(libpts::env::SokobanState s, format_context &ctx) const {
+    auto format(const libpts::env::SokobanState &s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };

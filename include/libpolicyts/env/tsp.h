@@ -145,13 +145,13 @@ struct std::hash<libpts::env::TSPDeadlockState> {
 
 template <>
 struct std::formatter<libpts::env::TSPState> : std::formatter<std::string> {
-    auto format(libpts::env::TSPState s, format_context &ctx) const {
+    auto format(const libpts::env::TSPState &s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };
 template <>
 struct std::formatter<libpts::env::TSPDeadlockState> : std::formatter<std::string> {
-    auto format(libpts::env::TSPDeadlockState s, format_context &ctx) const {
+    auto format(const libpts::env::TSPDeadlockState &s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };

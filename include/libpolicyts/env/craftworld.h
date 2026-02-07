@@ -146,7 +146,7 @@ struct std::hash<libpts::env::CraftWorldState> {
 
 template <>
 struct std::formatter<libpts::env::CraftWorldState> : std::formatter<std::string> {
-    auto format(libpts::env::CraftWorldState s, format_context &ctx) const {
+    auto format(const libpts::env::CraftWorldState &s, format_context &ctx) const {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };
