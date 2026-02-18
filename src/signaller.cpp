@@ -4,13 +4,14 @@
 #include <libpolicyts/signaller.h>
 
 #include <csignal>
+#include <cstdlib>
 
 namespace libpts {
 
 struct SignalHandler {
     static void signal_handler([[maybe_unused]] int s) {
         if (stop_token->stop_requested()) {
-            exit(1);
+            std::exit(1);
         } else {
             stop_token->stop();
         }
