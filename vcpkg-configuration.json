@@ -1,7 +1,7 @@
 {
   "default-registry": {
     "kind": "git",
-    "baseline": "62efe42f53b1886a20cbeb22ee9a27736d20f149",
+    "baseline": "81ded1ca9f81437a39dc520c653f3006953308f3",
     "repository": "https://github.com/microsoft/vcpkg"
   },
   "registries": [
@@ -12,10 +12,15 @@
     },
     {
       "kind": "git",
-      "repository": "https://github.com/tuero/vcpkg-registry",
+      "baseline": "5e254a6e0e47ea39223a1d6425787fe2c5ef5233",
       "reference": "master",
-      "baseline": "4faed1fd965a6c7495162a0a9f4bc4f8ca9f9cb9",
-      "packages": ["boulderdash", "craftworld", "sokoban", "tsp"]
+      "repository": "https://github.com/tuero/vcpkg-registry",
+      "packages": [
+        "boulderdash",
+        "craftworld",
+        "sokoban",
+        "tsp"
+      ]
     }
   ]
 }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.1.4 LANGUAGES CXX)
+project(libpolicyts VERSION 1.2.0 LANGUAGES CXX)
 
 
 # Build options

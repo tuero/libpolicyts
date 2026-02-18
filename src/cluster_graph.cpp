@@ -42,7 +42,7 @@ auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
     igraph_vs_t v_from, v_to;
     igraph_vs_1(&v_from, vid_from);
     igraph_vs_1(&v_to, vid_to);
-    igraph_distances(g, &m, v_from, v_to, IGRAPH_OUT);
+    igraph_distances(g, nullptr, &m, v_from, v_to, IGRAPH_OUT);
     auto distance = MATRIX(m, 0, 0);
     igraph_matrix_destroy(&m);
     igraph_vs_destroy(&v_from);
@@ -53,10 +53,10 @@ auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
     // Finite distance, so find path
     igraph_vector_int_t vertices;
     igraph_vector_int_init(&vertices, 0);
-    igraph_get_shortest_path(g, &vertices, nullptr, vid_from, vid_to, IGRAPH_OUT);
+    igraph_get_shortest_path(g, nullptr, &vertices, nullptr, vid_from, vid_to, IGRAPH_OUT);
     std::vector<int> path(static_cast<std::size_t>(igraph_vector_int_size(&vertices)));
     for (auto i : std::views::iota(0) | std::views::take(path.size())) {
-        path[static_cast<std::size_t>(i)] = VECTOR(vertices)[i];
+        path[static_cast<std::size_t>(i)] = static_cast<int>(VECTOR(vertices)[i]);
     }
     igraph_vector_int_destroy(&vertices);
     return path;
@@ -66,9 +66,9 @@ auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
 
 namespace detail {
 IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges) {
-    std::vector<igraph_integer_t> edge_vec =
-        edges | std::views::transform([](auto v) { return static_cast<igraph_integer_t>(v); })
-        | std::ranges::to<std::vector>();
+    std::vector<igraph_int_t> edge_vec = edges
+                                         | std::views::transform([](auto v) { return static_cast<igraph_int_t>(v); })
+                                         | std::ranges::to<std::vector>();
     // Create empty graphs with vertices but no edges
     if (auto error_code = igraph_empty(&stg, num_vertices, false)) {
         SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
@@ -80,8 +80,7 @@ IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges) {
     }
     // Allocate space and copy for the edges
     igraph_vector_int_t e;
-    if (auto error_code =
-            igraph_vector_int_init_array(&e, edge_vec.data(), static_cast<igraph_integer_t>(edge_vec.size())))
+    if (auto error_code = igraph_vector_int_init_array(&e, edge_vec.data(), static_cast<igraph_int_t>(edge_vec.size())))
     {
         SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
@@ -205,8 +204,8 @@ auto ClusterGraphs::sample_paths(
     };
     std::vector<std::vector<int>> paths;
 
-    std::vector<igraph_integer_t> edges =
-        std::views::iota(static_cast<igraph_integer_t>(0), igraph_ecount(&g)) | std::ranges::to<std::vector>();
+    std::vector<igraph_int_t> edges =
+        std::views::iota(static_cast<igraph_int_t>(0), igraph_ecount(&g)) | std::ranges::to<std::vector>();
     std::ranges::shuffle(edges, rng);
     for (auto eid : edges) {
         auto cid_from = static_cast<std::size_t>(IGRAPH_FROM(&g, eid));
