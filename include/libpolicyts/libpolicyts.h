@@ -3,7 +3,6 @@
 #include <libpolicyts/algorithm/lubyts.h>
 #include <libpolicyts/algorithm/multits.h>
 #include <libpolicyts/algorithm/phs.h>
-#include <libpolicyts/block_allocator.h>
 #include <libpolicyts/cluster_graph.h>
 #include <libpolicyts/concepts.h>
 #include <libpolicyts/logging.h>
@@ -12,6 +11,7 @@
 #include <libpolicyts/observation.h>
 #include <libpolicyts/resource.h>
 #include <libpolicyts/signaller.h>
+#include <libpolicyts/stable_pool.h>
 #include <libpolicyts/stop_token.h>
 #include <libpolicyts/test_runner.h>
 #include <libpolicyts/thread_pool.h>

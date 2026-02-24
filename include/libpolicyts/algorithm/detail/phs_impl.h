@@ -8,9 +8,9 @@
 #ifndef LIBPTS_ALGORITHM_DETAIL_PHS_H_
 #define LIBPTS_ALGORITHM_DETAIL_PHS_H_
 
-#include <libpolicyts/block_allocator.h>
 #include <libpolicyts/concepts.h>
 #include <libpolicyts/math_util.h>
+#include <libpolicyts/stable_pool.h>
 #include <libpolicyts/stop_token.h>
 #include <libpolicyts/timer.h>
 
@@ -102,7 +102,6 @@ struct SearchOutput {
 };
 
 constexpr double EPS = 1e-8;
-constexpr int BLOCK_ALLOCATION_SIZE = 2000;
 constexpr int INVALID_ACTION = -1;
 constexpr double DEFAULT_COST = 0.0;
 
@@ -152,14 +151,14 @@ struct Node {
     };
 
     // NOLINTBEGIN (misc-non-private-member-variables-in-classes)
-    EnvT state;                                  // State the node represents
-    double log_p = 0;                            // Log path probability from root to this
-    double g = 0;                                // Path cost from root to this
-    mutable double h = 0;                        // Heuristic value from this to a goal node
-    mutable double cost = DEFAULT_COST;          // LTS/PHS cost
-    const Node *parent = nullptr;                // Parent node
-    int action = INVALID_ACTION;                 // Action taken from parent
-    mutable std::vector<double> log_policy{};    // Local log policy over child actions
+    EnvT state;                          // State the node represents
+    double log_p = 0;                    // Log path probability from root to this
+    double g = 0;                        // Path cost from root to this
+    double h = 0;                        // Heuristic value from this to a goal node
+    double cost = DEFAULT_COST;          // LTS/PHS cost
+    const Node *parent = nullptr;        // Parent node
+    int action = INVALID_ACTION;         // Action taken from parent
+    std::vector<double> log_policy{};    // Local log policy over child actions
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 
@@ -187,10 +186,7 @@ class PHS {
 
 public:
     PHS(const SearchInput<EnvT, ModelT> &input_problem)
-        : input(input_problem),
-          status(Status::INIT),
-          model(input.model),
-          node_allocator(BLOCK_ALLOCATION_SIZE, input.state) {
+        : input(input_problem), status(Status::INIT), model(input.model) {
         reset();
     }
 
@@ -200,8 +196,7 @@ public:
             SPDLOG_ERROR("Coroutine needs to be reset() before calling init()");
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
         }
-        NodeT root_node(input.state);
-        const auto root_node_ptr = node_allocator.add(root_node);
+        const auto root_node_ptr = node_pool.emplace(input.state);
         generated_nodes.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
@@ -217,7 +212,7 @@ public:
             decltype(open) empty;
             std::swap(open, empty);
         }
-        node_allocator.clear();
+        node_pool.clear();
         closed.clear();
         generated_nodes.clear();
     }
@@ -271,7 +266,7 @@ public:
             }
 
             // Store in block and get ptr back
-            const auto child_node_ptr = node_allocator.add(std::move(child));
+            auto child_node_ptr = node_pool.emplace(std::move(child));
             generated_nodes.insert(child_node_ptr);
 
             // Solution found, no optimality guarantees so we return on generation instead of expansion
@@ -375,16 +370,16 @@ private:
         std::ranges::reverse(search_output.solution_path_costs);
     }
 
-    SearchInput<EnvT, ModelT> input;               // Search input, containing problem instance, models, budget, etc.
-    Status status{};                               // Current search status
-    bool timeout = false;                          // Timeout flag on budget
-    std::shared_ptr<ModelT> model;                 // Policy network with optional heuristic
-    SearchOutput<EnvT> search_output;              // Output of the search algorithm, containing trajectory + stats
-    std::vector<const NodeT *> inference_nodes;    // Nodes in queue for batch inference
-    OpenListT open;                                // Open list
-    ClosedListT closed;                            // Closed list
-    ClosedListT generated_nodes;                   // Open + Closed list
-    BlockAllocator<NodeT, typename NodeT::Hasher, typename NodeT::CompareEqual> node_allocator;
+    SearchInput<EnvT, ModelT> input;         // Search input, containing problem instance, models, budget, etc.
+    Status status{};                         // Current search status
+    bool timeout = false;                    // Timeout flag on budget
+    std::shared_ptr<ModelT> model;           // Policy network with optional heuristic
+    SearchOutput<EnvT> search_output;        // Output of the search algorithm, containing trajectory + stats
+    std::vector<NodeT *> inference_nodes;    // Nodes in queue for batch inference
+    OpenListT open;                          // Open list
+    ClosedListT closed;                      // Closed list
+    ClosedListT generated_nodes;             // Open + Closed list
+    StablePool<NodeT> node_pool;
 };
 
 }    // namespace libpts::algorithm::phs::detail

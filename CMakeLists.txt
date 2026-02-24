@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.2.1 LANGUAGES CXX)
+project(libpolicyts VERSION 1.3.0 LANGUAGES CXX)
 
 
 # Build options
@@ -43,7 +43,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/algorithm/phs.h
     include/libpolicyts/algorithm/detail/luby_impl.h
     include/libpolicyts/algorithm/detail/phs_impl.h
-    include/libpolicyts/block_allocator.h
+    include/libpolicyts/stable_pool.h
     include/libpolicyts/cluster_graph.h
     include/libpolicyts/concepts.h
     include/libpolicyts/libpolicyts.h
