@@ -28,6 +28,7 @@ auto aggregate_partition(RBConfigurationVertexPartition &partition) -> std::uniq
 }
 
 auto cluster_graph_from_partition(RBConfigurationVertexPartition *partition) -> igraph_t {
+    assert(partition);
     const igraph_t *g = partition->get_graph()->get_igraph();
     igraph_t cluster_graph;
     igraph_copy(&cluster_graph, g);
@@ -36,6 +37,7 @@ auto cluster_graph_from_partition(RBConfigurationVertexPartition *partition) -> 
 }
 
 auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
+    assert(g);
     // First check distance if < INF (otherwise igraph will report warning on non-paths)
     igraph_matrix_t m;
     igraph_matrix_init(&m, 0, 0);
@@ -71,27 +73,27 @@ IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges) {
                                          | std::ranges::to<std::vector>();
     // Create empty graphs with vertices but no edges
     if (auto error_code = igraph_empty(&stg, num_vertices, false)) {
-        SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
+        spdlog::error("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
     }
     if (auto error_code = igraph_empty(&d_stg, num_vertices, true)) {
-        SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
+        spdlog::error("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
     }
     // Allocate space and copy for the edges
     igraph_vector_int_t e;
     if (auto error_code = igraph_vector_int_init_array(&e, edge_vec.data(), static_cast<igraph_int_t>(edge_vec.size())))
     {
-        SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
+        spdlog::error("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
     }
     // Add edges to graphs
     if (auto error_code = igraph_add_edges(&stg, &e, nullptr)) {
-        SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
+        spdlog::error("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
     }
     if (auto error_code = igraph_add_edges(&d_stg, &e, nullptr)) {
-        SPDLOG_ERROR("unknown error: {:d}", static_cast<int>(error_code));
+        spdlog::error("unknown error: {:d}", static_cast<int>(error_code));
         std::exit(1);
     }
     igraph_vector_int_destroy(&e);
@@ -118,6 +120,7 @@ ClusterGraphs::ClusterGraphs(int num_vertices, const std::vector<int> &edges, st
 }
 
 void ClusterGraphs::louvain(std::size_t seed, double resolution) {
+    assert(igraph_data);
     Graph graph(&igraph_data->stg);
     RBConfigurationVertexPartition partition(&graph, resolution);
     RBConfigurationVertexPartition refined_partition(&graph, resolution);
@@ -125,6 +128,7 @@ void ClusterGraphs::louvain(std::size_t seed, double resolution) {
     optimiser.set_rng_seed(seed);
 
     igraph_data->clear_cluster_graphs();
+    igraph_data->cluster_memberships.clear();
 
     std::vector<std::unique_ptr<RBConfigurationVertexPartition>> allocated_partitions;
 
@@ -155,6 +159,7 @@ void ClusterGraphs::louvain(std::size_t seed, double resolution) {
         igraph_data->cluster_graphs.push_back(cluster_graph_from_partition(partition_agg));
         igraph_data->cluster_memberships.push_back(partition.membership());
     }
+    assert(igraph_data->cluster_graphs.size() == igraph_data->cluster_memberships.size());
 }
 
 auto ClusterGraphs::sample_paths(
@@ -163,8 +168,9 @@ auto ClusterGraphs::sample_paths(
     std::mt19937_64 &rng,
     int max_paths
 ) const -> std::vector<std::vector<int>> {
+    assert(base_graph);
     if (cluster_level < 0 || cluster_level >= hierarchy_size()) {
-        SPDLOG_ERROR("Unknown cluster level {:d} for range {:d}", cluster_level, hierarchy_size() - 1);
+        spdlog::error("Unknown cluster level {:d} for range {:d}", cluster_level, hierarchy_size() - 1);
         std::exit(1);
     }
     // Get cluster graph

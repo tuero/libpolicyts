@@ -17,6 +17,11 @@
 #include <absl/strings/str_cat.h>
 #include <spdlog/spdlog.h>
 
+#include <cassert>
+#include <exception>
+#include <string>
+#include <vector>
+
 namespace libpts::test {
 
 constexpr int KB_PER_MB = 1024;
@@ -84,6 +89,7 @@ void test_runner(
     double time_budget,
     std::string export_suffix
 ) {
+    assert(stop_token);
     int bootstrap_iter = 0;
     int64_t total_expansions = 0;
     int64_t total_generated = 0;
@@ -109,8 +115,8 @@ void test_runner(
 
     while (!timer_cpu.is_timeout() && bootstrap_iter < max_iterations && !outstanding_problems.empty()) {
         ++bootstrap_iter;
-        SPDLOG_INFO("Bootstrap iteration: {:d} of {:d}", bootstrap_iter, max_iterations);
-        SPDLOG_INFO("Remaining unsolved problems: {:d}", outstanding_problems.size());
+        spdlog::info("Bootstrap iteration: {:d} of {:d}", bootstrap_iter, max_iterations);
+        spdlog::info("Remaining unsolved problems: {:d}", outstanding_problems.size());
 
         // Update problem instance budget
         for (auto &p : outstanding_problems) {
@@ -124,12 +130,21 @@ void test_runner(
         {
             decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
             if (stop_token->stop_requested()) {
-                SPDLOG_INFO("Stop requested, exiting train batch loop");
+                spdlog::info("Stop requested, exiting train batch loop");
                 break;
             }
-            std::vector<SearchOutputT> results = pool.run(algorithm, batch);
+            std::vector<SearchOutputT> results;
+            try {
+                results = pool.run(algorithm, batch);
+            } catch (const std::exception &e) {
+                spdlog::error("ThreadPool run failed: {}", e.what());
+                throw;
+            } catch (...) {
+                spdlog::error("ThreadPool run failed with unknown exception.");
+                throw;
+            }
             if (stop_token->stop_requested()) {
-                SPDLOG_INFO("Stop requested, exiting train batch loop");
+                spdlog::info("Stop requested, exiting train batch loop");
                 break;
             }
 
@@ -185,7 +200,7 @@ void test_runner(
         search_budget *= 2;
 
         if (stop_token->stop_requested()) {
-            SPDLOG_INFO("Stop requested, exiting test iteration");
+            spdlog::info("Stop requested, exiting test iteration");
             break;
         }
     }
@@ -195,7 +210,7 @@ void test_runner(
     time_tracker.save();
     memory_tracker.save();
 
-    SPDLOG_INFO(
+    spdlog::info(
         "Total time cpu: {:.2f}s, total time wall: {:.2f}s total exp: {:d}, total gen: {:d}, total cost: {:.2f}",
         timer_cpu.get_duration(),
         timer_wall.get_duration(),
@@ -203,7 +218,7 @@ void test_runner(
         total_generated,
         total_cost
     );
-    SPDLOG_INFO("Maximum resident usage: {:.2f}MB", static_cast<double>(get_mem_usage()) / 1024);
+    spdlog::info("Maximum resident usage: {:.2f}MB", static_cast<double>(get_mem_usage()) / KB_PER_MB);
 }
 
 }    // namespace libpts::test

@@ -4,10 +4,10 @@
     "boulderdash",
     "craftworld",
     "igraph",
+    "libleidenalg",
     "nlohmann-json",
     "sokoban",
     "spdlog",
-    "tsp",
-    "libleidenalg"
+    "tsp"
   ]
 }

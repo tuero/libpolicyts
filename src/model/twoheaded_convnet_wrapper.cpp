@@ -20,7 +20,7 @@ namespace libpts::model {
 namespace {
 void check_config_key_exits(const nlohmann::json &model_config, const std::string &key) {
     if (!model_config.contains(key)) {
-        SPDLOG_ERROR("model config json should contain an entry '{}'", key);
+        spdlog::error("model config json should contain an entry '{}'", key);
         std::exit(1);
     }
 }
@@ -31,7 +31,7 @@ auto config_from_json(const nlohmann::json &model_config, const ObservationShape
     if (!model_config.contains("model_type")
         || model_config["model_type"].get<std::string>() != TwoHeadedConvNetWrapper::name)
     {
-        SPDLOG_ERROR("model config json should contain an entry 'model_type': '{}'", TwoHeadedConvNetWrapper::name);
+        spdlog::error("model config json should contain an entry 'model_type': '{}'", TwoHeadedConvNetWrapper::name);
         std::exit(1);
     }
     check_config_key_exits(model_config, "resnet_channels");
@@ -122,19 +122,19 @@ void TwoHeadedConvNetWrapper::print() const {
     std::ostringstream oss;
     std::ostream &os = oss;
     os << *model_;
-    SPDLOG_INFO("{:s}", oss.str());
+    spdlog::info("{:s}", oss.str());
     std::size_t num_params = 0;
     for (const auto &p : model_->parameters()) {
         num_params += static_cast<std::size_t>(p.numel());
     }
-    SPDLOG_INFO("Number of parameters: {:d}", num_params);
+    spdlog::info("Number of parameters: {:d}", num_params);
 }
 
 auto TwoHeadedConvNetWrapper::save_checkpoint(long long int step) -> std::string {
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
-    SPDLOG_INFO("Checkpointing model to {:s}.pt", full_path);
+    spdlog::info("Checkpointing model to {:s}.pt", full_path);
     torch::save(model_, absl::StrCat(full_path, ".pt"));
     torch::save(model_optimizer_, absl::StrCat(full_path, "-optimizer.pt"));
     return full_path;
@@ -143,7 +143,7 @@ auto TwoHeadedConvNetWrapper::save_checkpoint_without_optimizer(long long int st
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
-    SPDLOG_INFO("Checkpointing model to {:s}.pt", full_path);
+    spdlog::info("Checkpointing model to {:s}.pt", full_path);
     torch::save(model_, absl::StrCat(full_path, ".pt"));
     return full_path;
 }
@@ -152,22 +152,18 @@ void TwoHeadedConvNetWrapper::load_checkpoint(const std::string &path) {
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))
         || !std::filesystem::exists(absl::StrCat(path, "-optimizer.pt")))
     {
-        SPDLOG_ERROR("path {:s} does not contain model and/or optimizer", path);
-        throw std::filesystem::filesystem_error(
-            std::format("path {:s} does not contain model and/or optimizer", path),
-            std::error_code()
-        );
+        const auto error_msg = std::format("path {:s} does not contain model and/or optimizer", path);
+        spdlog::error(error_msg);
+        throw std::filesystem::filesystem_error(error_msg, std::error_code());
     }
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
     torch::load(model_optimizer_, absl::StrCat(path, "-optimizer.pt"), torch_device_);
 }
 void TwoHeadedConvNetWrapper::load_checkpoint_without_optimizer(const std::string &path) {
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))) {
-        SPDLOG_ERROR("path {:s} does not contain model", path);
-        throw std::filesystem::filesystem_error(
-            std::format("path {:s} does not contain model", path),
-            std::error_code()
-        );
+        const auto error_msg = std::format("path {:s} does not contain model", path);
+        spdlog::error(error_msg);
+        throw std::filesystem::filesystem_error(error_msg, std::error_code());
     }
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
 }
@@ -175,12 +171,26 @@ void TwoHeadedConvNetWrapper::load_checkpoint_without_optimizer(const std::strin
 auto TwoHeadedConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std::vector<InferenceOutput> {
     const int batch_size = static_cast<int>(batch.size());
 
+    // Check for bad input
+    for (const auto &batch_item : batch) {
+        if (static_cast<int>(batch_item.observation.size()) != input_flat_size) [[unlikely]] {
+            const auto error_msg = std::format(
+                "Input observation of size {:d} unexpected for size {:d}",
+                batch_item.observation.size(),
+                input_flat_size
+            );
+            spdlog::error(error_msg);
+            throw std::logic_error(error_msg);
+        }
+    }
+
     // Create tensor from raw flat array
     // torch::from_blob requires a pointer to non-const and doesn't take ownership
     auto options = torch::TensorOptions().dtype(torch::kFloat);
     torch::Tensor input_observations = torch::empty({batch_size, input_flat_size}, options);
     for (const auto &[idx, batch_item] : std::views::enumerate(batch)) {
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
+        assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options);
     }
 
@@ -214,6 +224,29 @@ auto TwoHeadedConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> s
 
 auto TwoHeadedConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
     const int batch_size = static_cast<int>(batch.size());
+
+    // Check for bad input
+    for (const auto &batch_item : batch) {
+        if (static_cast<int>(batch_item.observation.size()) != input_flat_size) [[unlikely]] {
+            const auto error_msg = std::format(
+                "Input observation of size {:d} unexpected for size {:d}",
+                batch_item.observation.size(),
+                input_flat_size
+            );
+            spdlog::error(error_msg);
+            throw std::logic_error(error_msg);
+        }
+        if (batch_item.target_action < 0 || batch_item.target_action >= num_actions) [[unlikely]] {
+            const auto error_msg = std::format(
+                "Input action {:d} unexpected for number of action {:d}",
+                batch_item.target_action,
+                num_actions
+            );
+            spdlog::error(error_msg);
+            throw std::logic_error(error_msg);
+        }
+    }
+
     const auto options_float = torch::TensorOptions().dtype(torch::kFloat);
     const auto options_long = torch::TensorOptions().dtype(torch::kLong);
 
@@ -226,8 +259,10 @@ auto TwoHeadedConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
 
     for (const auto &[idx, batch_item] : std::views::enumerate(batch)) {
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
+        assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options_float);
         target_actions[i] = batch_item.target_action;
+        assert(batch_item.target_action >= 0 && batch_item.target_action < num_actions);
         target_costs[i] = static_cast<float>(batch_item.target_cost_to_goal);
         expandeds[i] = static_cast<float>(batch_item.solution_expanded);
     }

@@ -14,6 +14,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cassert>
+#include <format>
 #include <random>
 #include <ranges>
 #include <string>
@@ -102,6 +104,7 @@ auto sample_trajectory(
     double epsilon,
     std::mt19937 &rng
 ) {
+    assert(policy_model);
     double g = 0;
     double log_p = 0;
     search_output.solution_found = false;
@@ -136,6 +139,18 @@ auto sample_trajectory(
                 return policy_model->inference(inference_inputs)[0].policy;
             }
         }();
+        if (policy.size() != EnvT::num_actions) [[unlikely]] {
+            const auto error_msg = std::format(
+                "Received policy of size {} for environment with {} actions.",
+                policy.size(),
+                EnvT::num_actions
+            );
+            spdlog::error(error_msg);
+            if (stop_token) {
+                stop_token->stop();
+            }
+            throw std::logic_error(error_msg);
+        }
         policy_noise_inplace(policy, epsilon);
 
         // Sample action

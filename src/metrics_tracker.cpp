@@ -23,7 +23,7 @@ auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics {
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     // NOLINTBEGIN (*-magic-numbers)
     if (strs.size() != 9) {
-        SPDLOG_ERROR("Error reading line {:s}, {:d}", str, strs.size());
+        spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
         throw std::runtime_error("line does not contain valid data for this metric");
     }
     return {
@@ -53,7 +53,7 @@ auto operator<<(std::ostream &os, const MemoryMetrics &metrics_item) -> std::ost
 auto MemoryMetrics::make_from_str(const std::string &str) -> MemoryMetrics {
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 2) {
-        SPDLOG_ERROR("Error reading line {:s}, {:d}", str, strs.size());
+        spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
         throw std::runtime_error("line does not contain valid data for this metric");
     }
     return {.iter = std::stoi(strs[0]), .max_rss = std::stod(strs[1])};
@@ -72,7 +72,7 @@ auto operator<<(std::ostream &os, const OutstandingMetrics &metrics_item) -> std
 auto OutstandingMetrics::make_from_str(const std::string &str) -> OutstandingMetrics {
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 2) {
-        SPDLOG_ERROR("Error reading line {:s}, {:d}", str, strs.size());
+        spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
         throw std::runtime_error("line does not contain valid data for this metric");
     }
     return {.expansions = std::stoi(strs[0]), .outstanding_problems = std::stoi(strs[1])};
@@ -92,7 +92,7 @@ auto operator<<(std::ostream &os, const TimeMetrics &metrics_item) -> std::ostre
 auto TimeMetrics::make_from_str(const std::string &str) -> TimeMetrics {
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 3) {
-        SPDLOG_ERROR("Error reading line {:s}, {:d}", str, strs.size());
+        spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
         throw std::runtime_error("line does not contain valid data for this metric");
     }
     return {

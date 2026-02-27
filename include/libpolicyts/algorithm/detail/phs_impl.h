@@ -17,6 +17,7 @@
 #include <absl/container/flat_hash_set.h>
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <queue>
@@ -114,6 +115,7 @@ struct Node {
 
     // Apply action, set parent and costs
     void apply_action(const Node<EnvT> *par, int a) {
+        assert(par);
         parent = par;
         auto c = state.apply_action(a);
         log_p = parent->log_p + parent->log_policy[static_cast<std::size_t>(a)];
@@ -127,6 +129,7 @@ struct Node {
             return node.state.get_hash();
         }
         auto operator()(const Node *node) const -> std::size_t {
+            assert(node);
             return node->state.get_hash();
         }
     };
@@ -136,16 +139,22 @@ struct Node {
             return lhs.state == rhs.state;
         }
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->state == rhs->state;
         }
     };
     struct CompareOrderedLess {
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->cost < rhs->cost;
         }
     };
     struct CompareOrderedGreater {
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->cost > rhs->cost;
         }
     };
@@ -187,13 +196,17 @@ class PHS {
 public:
     PHS(const SearchInput<EnvT, ModelT> &input_problem)
         : input(input_problem), status(Status::INIT), model(input.model) {
+        if (!model) {
+            SPDLOG_ERROR("PHS requires a non-null model - name: {:s}.", input.puzzle_name);
+            throw std::logic_error("PHS requires a non-null model.");
+        }
         reset();
     }
 
     // Initialize the search with root node inference output
     void init() {
         if (status != Status::INIT) {
-            SPDLOG_ERROR("Coroutine needs to be reset() before calling init()");
+            spdlog::error("Coroutine needs to be reset() before calling init()");
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
         }
         const auto root_node_ptr = node_pool.emplace(input.state);
@@ -202,6 +215,13 @@ public:
         batch_predict();
         status = Status::OK;
     }
+    ~PHS() = default;
+
+    // Copy/move disabled
+    PHS(const PHS &) = delete;
+    auto operator=(const PHS &) -> PHS & = delete;
+    PHS(PHS &&) = delete;
+    auto operator=(PHS &&) -> PHS & = delete;
 
     void reset() {
         status = Status::INIT;
@@ -226,6 +246,7 @@ public:
 
         // Remove top node from open and put into closed
         const auto current = open.top();
+        assert(current);
         open.pop();
         closed.insert(current);
         ++search_output.num_expanded;
@@ -266,6 +287,7 @@ public:
 
             // Store in block and get ptr back
             auto child_node_ptr = node_pool.emplace(std::move(child));
+            assert(child_node_ptr);
             generated_nodes.insert(child_node_ptr);
 
             // Solution found, no optimality guarantees so we return on generation instead of expansion
@@ -287,7 +309,7 @@ public:
         }
 
         // Batch inference
-        if (open.empty() || inference_nodes.size() >= static_cast<std::size_t>(input.inference_batch_size)) {
+        if (open.empty() || static_cast<int>(inference_nodes.size()) >= input.inference_batch_size) {
             batch_predict();
         }
     }
@@ -310,6 +332,7 @@ private:
         std::vector<InferenceInputT> inference_inputs;
         inference_inputs.reserve(inference_nodes.size());
         for (const auto &node : inference_nodes) {
+            assert(node);
             inference_inputs.emplace_back(node->state.get_observation());
         }
 
@@ -324,10 +347,11 @@ private:
             return;
         }
         for (auto &&[child_node, prediction] : std::views::zip(inference_nodes, predictions)) {
+            assert(child_node);
             if constexpr (HasHeuristic<decltype(prediction)>) {
                 child_node->h = std::max(prediction.heuristic, 0.0);
             }
-            if (prediction.policy.size() != EnvT::num_actions) [[unlikely]] {
+            if (static_cast<int>(prediction.policy.size()) != EnvT::num_actions) [[unlikely]] {
                 spdlog::error(
                     "Received policy of size {} for environment with {} actions.",
                     prediction.policy.size(),
@@ -372,7 +396,7 @@ private:
     SearchInput<EnvT, ModelT> input;         // Search input, containing problem instance, models, budget, etc.
     Status status{};                         // Current search status
     bool timeout = false;                    // Timeout flag on budget
-    std::shared_ptr<ModelT> model;           // Policy network with optional heuristic
+    const std::shared_ptr<ModelT> model;     // Policy network with optional heuristic
     SearchOutput<EnvT> search_output;        // Output of the search algorithm, containing trajectory + stats
     std::vector<NodeT *> inference_nodes;    // Nodes in queue for batch inference
     OpenListT open;                          // Open list

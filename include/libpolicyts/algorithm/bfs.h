@@ -13,10 +13,12 @@
 #include <absl/container/flat_hash_set.h>
 #include <spdlog/spdlog.h>
 
+#include <cassert>
 #include <cstdint>
 #include <memory>
 #include <queue>
 #include <ranges>
+#include <stdexcept>
 #include <string>
 
 namespace libpts::algorithm::bfs {
@@ -88,6 +90,7 @@ struct Node {
 
     // Apply action, set parent and costs
     void apply_action(const Node<EnvT> *par, int a) {
+        assert(par);
         parent = par;
         auto c = state.apply_action(a);
         g = parent->g + c;
@@ -100,6 +103,7 @@ struct Node {
             return node.state.get_hash();
         }
         auto operator()(const Node *node) const -> std::size_t {
+            assert(node);
             return node->state.get_hash();
         }
     };
@@ -109,16 +113,22 @@ struct Node {
             return lhs.state == rhs.state;
         }
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->state == rhs->state;
         }
     };
     struct CompareOrderedLess {
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->cost < rhs->cost;
         }
     };
     struct CompareOrderedGreater {
         auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+            assert(lhs);
+            assert(rhs);
             return lhs->cost > rhs->cost;
         }
     };
@@ -152,8 +162,19 @@ class BFS {
 public:
     BFS(const SearchInput<EnvT, ModelT> &input_problem)
         : input(input_problem), status(Status::INIT), model(input.model) {
+        if (!model) {
+            SPDLOG_ERROR("BFS requires a non-null model - name: {:s}.", input.puzzle_name);
+            throw std::logic_error("BFS requires a non-null model.");
+        }
         reset();
     }
+    ~BFS() = default;
+
+    // Copy/move disabled
+    BFS(const BFS &) = delete;
+    auto operator=(const BFS &) -> BFS & = delete;
+    BFS(BFS &&) = delete;
+    auto operator=(BFS &&) -> BFS & = delete;
 
     // Initialize the search with root node inference output
     void init() {
@@ -191,6 +212,7 @@ public:
 
         // Remove top node from open and put into closed
         const auto current = open.top();
+        assert(current);
         open.pop();
         closed.insert(current);
         ++search_output.num_expanded;
@@ -232,6 +254,7 @@ public:
 
             // Store in block and get ptr back
             auto child_node_ptr = node_pool.emplace(std::move(child));
+            assert(child_node_ptr);
             generated_nodes.insert(child_node_ptr);
 
             // Solution found, no optimality guarantees so we return on generation instead of expansion
@@ -253,7 +276,7 @@ public:
         }
 
         // Batch inference
-        if (open.empty() || inference_nodes.size() >= static_cast<std::size_t>(input.inference_batch_size)) {
+        if (open.empty() || static_cast<int>(inference_nodes.size()) >= input.inference_batch_size) {
             batch_predict();
         }
     }
@@ -276,6 +299,7 @@ private:
         std::vector<InferenceInputT> inference_inputs;
         inference_inputs.reserve(inference_nodes.size());
         for (const auto &node : inference_nodes) {
+            assert(node);
             inference_inputs.emplace_back(node->state.get_observation());
         }
 
@@ -290,6 +314,7 @@ private:
             return;
         }
         for (auto &&[child_node, prediction] : std::views::zip(inference_nodes, predictions)) {
+            assert(child_node);
             child_node->h = std::max(prediction.heuristic, 0.0);
             child_node->cost = (input.weight_g * child_node->g) + (input.weight_h * child_node->h);
             open.push(child_node);
@@ -321,7 +346,7 @@ private:
     SearchInput<EnvT, ModelT> input;         // Search input, containing problem instance, models, budget, etc.
     Status status{};                         // Current search status
     bool timeout = false;                    // Timeout flag on budget
-    std::shared_ptr<ModelT> model;           // Policy network with optional heuristic
+    const std::shared_ptr<ModelT> model;     // Policy network with optional heuristic
     SearchOutput<EnvT> search_output;        // Output of the search algorithm, containing trajectory + stats
     std::vector<NodeT *> inference_nodes;    // Nodes in queue for batch inference
     OpenListT open;                          // Open list

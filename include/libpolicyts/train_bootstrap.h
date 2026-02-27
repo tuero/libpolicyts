@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
 #include <random>
 #include <ranges>
 #include <unordered_set>
@@ -191,6 +192,7 @@ void train_bootstrap(
     int extra_iterations = 0,
     bool resume = false
 ) {
+    assert(stop_token);
     int bootstrap_iter = 0;
     int search_budget = initial_search_budget;
     int validation_budget = initial_search_budget;
@@ -233,7 +235,7 @@ void train_bootstrap(
             }
             validation_budget = row.budget;
         }
-        SPDLOG_INFO("Skipping Bootstrap iters {:d}, batches {:d}", bootstrap_to_skip, batch_to_skip);
+        spdlog::info("Skipping Bootstrap iters {:d}, batches {:d}", bootstrap_to_skip, batch_to_skip);
     }
 
     // Initialize metrics
@@ -259,8 +261,8 @@ void train_bootstrap(
         std::size_t prev_n_solved_train = solved_set_train.size();
         long long int solved_expansions = 0;    // Expansions required for solved problems this iter
         int curr_n_solved_train = 0;
-        SPDLOG_INFO("Bootstrap iteration: {:d} of {:d}", bootstrap_iter, max_iterations);
-        SPDLOG_INFO(
+        spdlog::info("Bootstrap iteration: {:d} of {:d}", bootstrap_iter, max_iterations);
+        spdlog::info(
             "Remaining unsolved problems: Train = {:d}, Validate = {:d}",
             n_outstanding_train,
             n_outstanding_validate
@@ -286,7 +288,7 @@ void train_bootstrap(
              problems_train | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
         {
             decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
-            SPDLOG_INFO(
+            spdlog::info(
                 "Iteration {:d}, Batch: {:d} of {:d}, CPU time: {:.2f}, Wall time: {:.2f}",
                 bootstrap_iter,
                 batch_idx,
@@ -300,15 +302,24 @@ void train_bootstrap(
             }
 
             if (stop_token->stop_requested()) {
-                SPDLOG_INFO("Stop requested, exiting train batch loop");
+                spdlog::info("Stop requested, exiting train batch loop");
                 break;
             }
 
             learner.preprocess(batch, true);
-            std::vector<SearchOutputT> results = pool.run(algorithm, batch);
+            std::vector<SearchOutputT> results;
+            try {
+                results = pool.run(algorithm, batch);
+            } catch (const std::exception &e) {
+                spdlog::error("ThreadPool run failed: {}", e.what());
+                throw;
+            } catch (...) {
+                spdlog::error("ThreadPool run failed with unknown exception.");
+                throw;
+            }
 
             if (stop_token->stop_requested()) {
-                SPDLOG_INFO("Stop requested, exiting train batch loop");
+                spdlog::info("Stop requested, exiting train batch loop");
                 break;
             }
 
@@ -375,7 +386,7 @@ void train_bootstrap(
 
             // Timeout
             if (duration >= time_budget) {
-                SPDLOG_INFO("Timeout, exiting train batch loop");
+                spdlog::info("Timeout, exiting train batch loop");
                 break;
             }
         }
@@ -385,21 +396,30 @@ void train_bootstrap(
         memory_tracker.save();
 
         if (stop_token->stop_requested()) {
-            SPDLOG_INFO("Stop requested, exiting iteration loop");
+            spdlog::info("Stop requested, exiting iteration loop");
             break;
         }
 
         if (duration < time_budget) {
-            SPDLOG_INFO("Running Validation Iteration");
+            spdlog::info("Running Validation Iteration");
             for (const auto &[batch_idx, batch_chunk] :
                  problems_validate | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
             {
                 decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
                 learner.preprocess(batch, false);
-                std::vector<SearchOutputT> results = pool.run(algorithm, batch);
+                std::vector<SearchOutputT> results;
+                try {
+                    results = pool.run(algorithm, batch);
+                } catch (const std::exception &e) {
+                    spdlog::error("ThreadPool run failed: {}", e.what());
+                    throw;
+                } catch (...) {
+                    spdlog::error("ThreadPool run failed with unknown exception.");
+                    throw;
+                }
 
                 if (stop_token->stop_requested()) {
-                    SPDLOG_INFO("Stop requested, exiting validation batch loop");
+                    spdlog::info("Stop requested, exiting validation batch loop");
                     break;
                 }
 
@@ -437,13 +457,13 @@ void train_bootstrap(
                 }
             }
         } else {
-            SPDLOG_INFO("Skipping validation due to timeout");
+            spdlog::info("Skipping validation due to timeout");
         }
         metrics_tracker_validate.save();
 
         // Break out if stop requested
         if (stop_token->stop_requested()) {
-            SPDLOG_INFO("Stop requested, exiting bootstrap loop");
+            spdlog::info("Stop requested, exiting bootstrap loop");
             break;
         }
 
@@ -455,8 +475,8 @@ void train_bootstrap(
         }
 
         if (static_cast<int>(solved_set_validate.size()) >= n_validate_exit && !last_iteration) {
-            SPDLOG_INFO("Solved validation set ratio exceeded.");
-            SPDLOG_INFO("Running one more pass over training set.");
+            spdlog::info("Solved validation set ratio exceeded.");
+            spdlog::info("Running one more pass over training set.");
             last_iteration = true;
             // Don't check if we should modify budget, as this was enough to solve validation set
             continue;
@@ -495,8 +515,8 @@ void train_bootstrap(
     memory_tracker.save();
     time_tracker.save();
 
-    SPDLOG_INFO("Total cpu time: {:.2f}, wall time: {:.2f}", total_time_cpu, total_time_wall);
-    SPDLOG_INFO("Maximum resident usage: {:.2f}MB", static_cast<double>(get_mem_usage()) / 1024);
+    spdlog::info("Total cpu time: {:.2f}, wall time: {:.2f}", total_time_cpu, total_time_wall);
+    spdlog::info("Maximum resident usage: {:.2f}MB", static_cast<double>(get_mem_usage()) / KB_PER_MB);
 }
 
 }    // namespace libpts::train

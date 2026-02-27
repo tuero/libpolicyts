@@ -4,6 +4,8 @@
 #ifndef LIBPTS_THREAD_POOL_H_
 #define LIBPTS_THREAD_POOL_H_
 
+#include <atomic>
+#include <exception>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -36,10 +38,12 @@ public:
      * @param inputs Input items for each job, gets passed to the given function
      * @return Vector of results, in order of given jobs during construction
      */
-    [[nodiscard]] auto run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs) noexcept
+    [[nodiscard]] auto run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs)
         -> std::vector<OutputT> {
         // Populate queue
         int id = -1;
+        stop_requested_.store(false, std::memory_order_relaxed);
+        first_exception_ = nullptr;
         {
             std::queue<QueueItemInput> empty;
             std::swap(queue_input_, empty);
@@ -64,6 +68,11 @@ public:
             t.join();
         }
         threads_.clear();
+
+        // One of the threads failed
+        if (first_exception_) {
+            std::rethrow_exception(first_exception_);
+        }
 
         // Compile results, such that the id is in order to match passed order
         std::vector<std::optional<OutputT>> result_slots(inputs.size());
@@ -92,8 +101,7 @@ public:
      * @param workers Number of threads to use
      * @return Vector of results, in order of given jobs during construction
      */
-    [[nodiscard]] auto
-        run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs, std::size_t workers) noexcept
+    [[nodiscard]] auto run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs, std::size_t workers)
         -> std::vector<OutputT> {
         std::size_t old_count = num_threads_;
         num_threads_ = workers;
@@ -114,11 +122,21 @@ private:
     };
 
     // Runner for each thread, runs given function and pulls next item from input jobs if available
-    void thread_runner(std::function<OutputT(InputT)> func) noexcept {
+    void thread_runner(std::function<OutputT(InputT)> func) {
         while (true) {
+            // Stop early if another thread throws
+            if (stop_requested_.load(std::memory_order_relaxed)) {
+                return;
+            }
             std::optional<QueueItemInput> item;
             {
                 std::lock_guard<std::mutex> lock(queue_input_m_);
+
+                // Stop early if another thread throws
+                // Check again if another throw threads while we were waiting for lock
+                if (stop_requested_.load(std::memory_order_relaxed)) {
+                    return;
+                }
 
                 // Jobs are done, thread can stop
                 if (queue_input_.empty()) {
@@ -129,13 +147,29 @@ private:
                 queue_input_.pop();
             }
 
-            // Run job
-            OutputT result = func(item->input);
+            // Stop early if another thread throws
+            // Final check again before we actually do work
+            if (stop_requested_.load(std::memory_order_relaxed)) {
+                return;
+            }
 
-            // Store result
-            {
-                std::lock_guard<std::mutex> lock(queue_output_m_);
-                queue_output_.emplace(std::move(result), item->id);
+            // Run job
+            try {
+                auto result = func(item->input);
+
+                // Store result
+                {
+                    std::lock_guard<std::mutex> lock(queue_output_m_);
+                    queue_output_.emplace(std::move(result), item->id);
+                }
+            } catch (...) {
+                // Thread threw, set stop signal so other threads can early exit
+                stop_requested_.store(true, std::memory_order_relaxed);
+                std::lock_guard<std::mutex> lock(exception_m_);
+                if (!first_exception_) {
+                    first_exception_ = std::current_exception();
+                }
+                return;
             }
         }
     }
@@ -146,6 +180,9 @@ private:
     std::queue<QueueItemOutput> queue_output_;
     std::mutex queue_input_m_;
     std::mutex queue_output_m_;
+    std::exception_ptr first_exception_;    // Saved exception thrown by child thread
+    std::mutex exception_m_;
+    std::atomic_bool stop_requested_{false};
 };
 
 }    // namespace libpts
