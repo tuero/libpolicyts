@@ -247,7 +247,6 @@ public:
         // Consider all children
         for (int a : std::views::iota(0) | std::views::take(current->state.num_actions)) {
             NodeT child = *current;
-            child.parent = current;
             child.apply_action(current, a);
 
             // Self loop
@@ -341,7 +340,7 @@ private:
                 return;
             }
             child_node->log_policy = std::move(prediction.policy);
-            log_policy_noise(child_node->log_policy, input.mix_epsilon);
+            log_policy_noise_inplace(child_node->log_policy, input.mix_epsilon);
             child_node->cost = phs_cost(child_node->log_p, child_node->g, child_node->h);
             open.push(child_node);
             ++search_output.num_generated;

@@ -16,7 +16,7 @@ namespace libpts {
  * @param epislon Amount of mixing with uniform policy, between 0 and 1.
  * @return Vector of policy with log + uniform mixture applied
  */
-auto policy_noise(const std::vector<double> &policy, double epsilon = 0) -> std::vector<double>;
+[[nodiscard]] auto policy_noise(const std::vector<double> &policy, double epsilon = 0) -> std::vector<double>;
 
 /**
  * Apply uniform mixture to policy in-place
@@ -31,7 +31,7 @@ void policy_noise_inplace(std::vector<double> &policy, double epsilon = 0);
  * @param epislon Amount of mixing with uniform policy, between 0 and 1.
  * @return Vector of policy with log + uniform mixture applied
  */
-auto log_policy_noise(const std::vector<double> &policy, double epsilon = 0) -> std::vector<double>;
+[[nodiscard]] auto log_policy_noise(const std::vector<double> &policy, double epsilon = 0) -> std::vector<double>;
 
 /**
  * Apply log + uniform mixture to policy in-place
