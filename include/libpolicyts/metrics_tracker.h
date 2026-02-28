@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <concepts>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -15,6 +16,14 @@
 #include <vector>
 
 namespace libpts {
+
+// Concept for valid metric items
+template <typename T>
+concept IsMetricsItem = requires(const T &ct, const std::string &s, std::ostream &os) {
+    { T::make_from_str(s) } -> std::same_as<T>;      // Construct from str
+    { T::dump_header(os) };                          // Write out header
+    { os << ct } -> std::same_as<std::ostream &>;    // Write out item
+};
 
 // Specific problem instance being solved
 struct ProblemMetrics {
@@ -61,7 +70,7 @@ struct TimeMetrics {
 };
 
 // Generic tracker for the above metrics type
-template <typename MetricsItem>
+template <IsMetricsItem MetricsItem>
 class MetricsTracker {
 public:
     MetricsTracker() = delete;
