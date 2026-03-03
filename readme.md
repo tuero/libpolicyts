@@ -8,7 +8,7 @@ Usage implementations of training and testing neural policies/heuristics for the
 > Why implement all this in C++?
 
 Speed matters, especially when running search over complex environment domains.
-Even with neural policies/heuristics being used to query for each generated node, you can often see ~2x speedups by keeping the search in the C++ runtime rather than writing your search algorithms in Python.
+Even with neural policies/heuristics being used to query for each generated node, you can often see ~2-4x speedups by keeping the search in the C++ runtime rather than writing your search algorithms in Python.
 
 ## Implemented Algorithms
 The following algorithms are implemented in `include/libpolicyts/algorithm/`, 
@@ -18,6 +18,20 @@ which support both user-defined policy/heuristics and neural network defined ver
 - __MultiTS__: Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
 - __LevinTS__: Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
 - __PHS*__: Orseau, Laurent, and Levi HS Lelis. "Policy-guided heuristic search with guarantees." Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 35. No. 14. 2021.
+- $\sqrt{\mathrm{LTS}}$: Orseau, Laurent, Marcus Hutter, and Levi HS Lelis. "Exponential Speedups by Rerooting Levin Tree Search." (2024).
+- __Bootstrap Training__: Jabbari Arfaee, S.; Zilles, S.; and Holte, R. C. 2011. Learning heuristic functions for large state spaces. Artificial Intelligence 175(16): 2075–2098
+
+
+## Documentation
+For some documentation on how to instantiate each algorithm, see the list below.
+For full code examples, see `examples/`.
+- [Best First Search](docs/bfs.md)
+- [LubyTS](docs/lubyts.md)
+- [MultiTS](docs/multits.md)
+- [LevinTS](docs/lts.md)
+- [PHS](docs/phs.md)
+- [Root-LTS](docs/rlts.md)
+- [Bootstrap Training and Testing](docs/bootstrap.md)
 
 
 ## Implemented Environments
@@ -29,14 +43,17 @@ This can be enabled by setting the `LIBPOLICYTS_BUILD_ENVIRONMENTS` CMake flag.
 - [sokoban](https://github.com/tuero/sokoban_cpp)
 - [tsp](https://github.com/tuero/tsp_cpp)
 
+
 ## Implemented Neural Models
 The following environment wrappers are implemented in `include/libpolicyts/model/`, 
 which support all of the concepts required for all implemented algorithms.
 This can be enabled by setting the `LIBPOLICYTS_BUILD_TORCH` CMake flag, with libtorch in your path through the environment variable `LIBTORCH_ROOT`
 (see the section below about building)
+- `BinaryClassifierConvNetWrapper`: A ResNet style binary classifier net
 - `HeuristicConvNetWrapper`: A ResNet style heuristic net
 - `PolicyConvNetWrapper`: A ResNet style policy net
 - `TwoHeadedConvNetWrapper`: A ResNet style two headed policy + heuristic net
+
 
 ## Auxiliary Utilities
 - Neural Network policy and heuristic functions through `libtorch` which are compatible with all implemented algorithms, which can be found in `include/libpolicyts/model/`

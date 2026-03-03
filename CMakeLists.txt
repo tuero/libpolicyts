@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.4.1 LANGUAGES CXX)
+project(libpolicyts VERSION 1.5.0 LANGUAGES CXX)
 
 
 # Build options
@@ -41,6 +41,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/algorithm/lubyts.h
     include/libpolicyts/algorithm/multits.h
     include/libpolicyts/algorithm/phs.h
+    include/libpolicyts/algorithm/rlts.h
     include/libpolicyts/algorithm/detail/luby_impl.h
     include/libpolicyts/algorithm/detail/phs_impl.h
     include/libpolicyts/stable_pool.h
@@ -66,11 +67,11 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/env/sokoban.h
     include/libpolicyts/env/tsp.h
     # Headers which depend on libtorch
-    include/libpolicyts/model/detail/heuristic_convnet.h
+    include/libpolicyts/model/detail/convnet.h
     include/libpolicyts/model/detail/layers.h
-    include/libpolicyts/model/detail/policy_convnet.h
     include/libpolicyts/model/detail/twoheaded_convnet.h
     include/libpolicyts/model/base_model_wrapper.h
+    include/libpolicyts/model/binary_classifier_convnet_wrapper.h
     include/libpolicyts/model/heuristic_convnet_wrapper.h
     include/libpolicyts/model/policy_convnet_wrapper.h
     include/libpolicyts/model/torch_init.h

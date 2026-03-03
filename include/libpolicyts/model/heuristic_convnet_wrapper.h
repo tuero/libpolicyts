@@ -9,7 +9,7 @@
 #endif
 
 #include <libpolicyts/model/base_model_wrapper.h>
-#include <libpolicyts/model/detail/heuristic_convnet.h>
+#include <libpolicyts/model/detail/convnet.h>
 #include <libpolicyts/observation.h>
 
 #include <nlohmann/json.hpp>
@@ -100,7 +100,7 @@ public:
 
 protected:
     Config config;
-    network::HeuristicConvNet model_;
+    network::ConvNet model_;
     torch::optim::Adam model_optimizer_;
     int input_flat_size;
 };

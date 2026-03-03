@@ -1,8 +1,8 @@
-// File: policy_convnet_wrapper.h
-// Description: Convnet wrapper for policy
+// File: binary_classifier_convnet_wrapper.h
+// Description: Convnet wrapper for binary classification
 
-#ifndef LIBPTS_WRAPPER_POLICY_CONVNET_H_
-#define LIBPTS_WRAPPER_POLICY_CONVNET_H_
+#ifndef LIBPTS_WRAPPER_BINARY_CLASSIFIER_CONVNET_H_
+#define LIBPTS_WRAPPER_BINARY_CLASSIFIER_CONVNET_H_
 
 #ifndef LIBPTS_TORCH_FOUND
 #error "libpolicyts was built without torch support. Rebuild with torch support enabled."
@@ -16,17 +16,16 @@
 
 namespace libpts::model {
 
-class PolicyConvNetWrapper : public BaseModelWrapper {
+class BinaryClassifierConvNetWrapper : public BaseModelWrapper {
 public:
-    inline static const std::string name = "policy_convnet";
+    inline static const std::string name = "binary_classifier_convnet";
 
     struct Config {
         ObservationShape observation_shape;
-        int num_actions;
         int resnet_channels;
         int resnet_blocks;
-        int policy_channels;
-        std::vector<int> policy_mlp_layers;
+        int reduce_channels;
+        std::vector<int> mlp_layers;
         bool use_batchnorm;
         double learning_rate;
         double l2_weight_decay;
@@ -37,27 +36,23 @@ public:
     };
 
     struct InferenceOutput {
-        std::vector<double> logits;
-        std::vector<double> policy;
-        std::vector<double> log_policy;
+        double probability;
     };
 
     struct LearningInput {
         Observation observation;
-        int target_action;
-        int solution_expanded;
+        int target_class;
     };
 
-    PolicyConvNetWrapper(
+    BinaryClassifierConvNetWrapper(
         Config config,
         const std::string &device,
         const std::string &output_path,
         const std::string &checkpoint_base_name = ""
     );
-    PolicyConvNetWrapper(
+    BinaryClassifierConvNetWrapper(
         const nlohmann::json &model_config_json,
         const ObservationShape &obs_shape,
-        int num_actions,
         const std::string &device,
         const std::string &output_path,
         const std::string &checkpoint_base_name = ""
@@ -108,9 +103,8 @@ protected:
     network::ConvNet model_;
     torch::optim::Adam model_optimizer_;
     int input_flat_size;
-    int num_actions;
 };
 
 }    // namespace libpts::model
 
-#endif    // LIBPTS_WRAPPER_POLICY_CONVNET_H_
+#endif    // LIBPTS_WRAPPER_BINARY_CLASSIFIER_CONVNET_H_

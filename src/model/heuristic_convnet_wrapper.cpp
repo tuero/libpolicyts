@@ -65,6 +65,7 @@ HeuristicConvNetWrapper::HeuristicConvNetWrapper(
       config(std::move(config_)),
       model_(
           config.observation_shape,
+          1,
           config.resnet_channels,
           config.resnet_blocks,
           config.heuristic_channels,
@@ -90,6 +91,7 @@ HeuristicConvNetWrapper::HeuristicConvNetWrapper(
       config(config_from_json(model_config_json, obs_shape)),
       model_(
           config.observation_shape,
+          1,
           config.resnet_channels,
           config.resnet_blocks,
           config.heuristic_channels,
@@ -192,7 +194,7 @@ auto HeuristicConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> s
 
     // Run inference
     const auto model_output = model_->forward(input_observations);
-    const auto heuristic_output = model_output.heuristic.to(torch::kCPU);
+    const auto heuristic_output = model_output.logits.to(torch::kCPU);
     std::vector<InferenceOutput> inference_output;
     for (int i = 0; i < batch_size; ++i) {
         inference_output.emplace_back(heuristic_output[i].item<double>());
@@ -244,7 +246,7 @@ auto HeuristicConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     // Get model output
     auto model_output = model_->forward(input_observations);
 
-    const torch::Tensor loss = mean_squared_error_loss(model_output.heuristic, target_costs, true);
+    const torch::Tensor loss = mean_squared_error_loss(model_output.logits, target_costs, true);
     auto loss_value = loss.item<double>();
 
     // Optimize model

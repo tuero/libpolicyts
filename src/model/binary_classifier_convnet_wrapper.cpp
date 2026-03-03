@@ -1,7 +1,7 @@
-// File: policy_convnet_wrapper.cpp
-// Description: Convnet wrapper for policy
+// File: binary_classifier_convnet_wrapper.cpp
+// Description: Convnet wrapper for binary classification
 
-#include <libpolicyts/model/policy_convnet_wrapper.h>
+#include <libpolicyts/model/binary_classifier_convnet_wrapper.h>
 #include <libpolicyts/model/torch_util.h>
 
 // NOLINTBEGIN
@@ -25,13 +25,16 @@ void check_config_key_exits(const nlohmann::json &model_config, const std::strin
     }
 }
 
-auto config_from_json(const nlohmann::json &model_config, const ObservationShape &obs_shape, int num_actions)
-    -> PolicyConvNetWrapper::Config {
+auto config_from_json(const nlohmann::json &model_config, const ObservationShape &obs_shape)
+    -> BinaryClassifierConvNetWrapper::Config {
     // Check for valid json
     if (!model_config.contains("model_type")
-        || model_config["model_type"].get<std::string>() != PolicyConvNetWrapper::name)
+        || model_config["model_type"].get<std::string>() != BinaryClassifierConvNetWrapper::name)
     {
-        spdlog::error("model config json should contain an entry 'model_type': '{}'", PolicyConvNetWrapper::name);
+        spdlog::error(
+            "model config json should contain an entry 'model_type': '{}'",
+            BinaryClassifierConvNetWrapper::name
+        );
         std::exit(1);
     }
     check_config_key_exits(model_config, "resnet_channels");
@@ -44,11 +47,10 @@ auto config_from_json(const nlohmann::json &model_config, const ObservationShape
 
     return {
         .observation_shape = obs_shape,
-        .num_actions = num_actions,
         .resnet_channels = model_config["resnet_channels"].template get<int>(),
         .resnet_blocks = model_config["resnet_blocks"].template get<int>(),
-        .policy_channels = model_config["policy_channels"].template get<int>(),
-        .policy_mlp_layers = model_config["policy_mlp_layers"].template get<std::vector<int>>(),
+        .reduce_channels = model_config["reduce_channels"].template get<int>(),
+        .mlp_layers = model_config["mlp_layers"].template get<std::vector<int>>(),
         .use_batchnorm = model_config["use_batchnorm"].template get<bool>(),
         .learning_rate = model_config["learning_rate"].template get<double>(),
         .l2_weight_decay = model_config["l2_weight_decay"].template get<double>(),
@@ -56,7 +58,7 @@ auto config_from_json(const nlohmann::json &model_config, const ObservationShape
 }
 }    // namespace
 
-PolicyConvNetWrapper::PolicyConvNetWrapper(
+BinaryClassifierConvNetWrapper::BinaryClassifierConvNetWrapper(
     Config config_,
     const std::string &device,
     const std::string &output_path,
@@ -66,51 +68,48 @@ PolicyConvNetWrapper::PolicyConvNetWrapper(
       config(std::move(config_)),
       model_(
           config.observation_shape,
-          config.num_actions,
+          1,
           config.resnet_channels,
           config.resnet_blocks,
-          config.policy_channels,
-          config.policy_mlp_layers,
+          config.reduce_channels,
+          config.mlp_layers,
           config.use_batchnorm
       ),
       model_optimizer_(
           model_->parameters(),
           torch::optim::AdamOptions(config.learning_rate).weight_decay(config.l2_weight_decay)
       ),
-      input_flat_size(config.observation_shape.flat_size()),
-      num_actions(config.num_actions) {
+      input_flat_size(config.observation_shape.flat_size()) {
     model_->to(torch_device_);
 };
 
-PolicyConvNetWrapper::PolicyConvNetWrapper(
+BinaryClassifierConvNetWrapper::BinaryClassifierConvNetWrapper(
     const nlohmann::json &model_config_json,
     const ObservationShape &obs_shape,
-    int _num_actions,
     const std::string &device,
     const std::string &output_path,
     const std::string &checkpoint_base_name
 )
     : BaseModelWrapper(device, output_path, checkpoint_base_name),
-      config(config_from_json(model_config_json, obs_shape, _num_actions)),
+      config(config_from_json(model_config_json, obs_shape)),
       model_(
           config.observation_shape,
-          config.num_actions,
+          1,
           config.resnet_channels,
           config.resnet_blocks,
-          config.policy_channels,
-          config.policy_mlp_layers,
+          config.reduce_channels,
+          config.mlp_layers,
           config.use_batchnorm
       ),
       model_optimizer_(
           model_->parameters(),
           torch::optim::AdamOptions(config.learning_rate).weight_decay(config.l2_weight_decay)
       ),
-      input_flat_size(config.observation_shape.flat_size()),
-      num_actions(config.num_actions) {
+      input_flat_size(config.observation_shape.flat_size()) {
     model_->to(torch_device_);
 };
 
-void PolicyConvNetWrapper::print() const {
+void BinaryClassifierConvNetWrapper::print() const {
     std::ostringstream oss;
     std::ostream &os = oss;
     os << *model_;
@@ -122,7 +121,7 @@ void PolicyConvNetWrapper::print() const {
     spdlog::info("Number of parameters: {:d}", num_params);
 }
 
-auto PolicyConvNetWrapper::save_checkpoint(long long int step) -> std::string {
+auto BinaryClassifierConvNetWrapper::save_checkpoint(long long int step) -> std::string {
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
@@ -131,7 +130,7 @@ auto PolicyConvNetWrapper::save_checkpoint(long long int step) -> std::string {
     torch::save(model_optimizer_, absl::StrCat(full_path, "-optimizer.pt"));
     return full_path;
 }
-auto PolicyConvNetWrapper::save_checkpoint_without_optimizer(long long int step) -> std::string {
+auto BinaryClassifierConvNetWrapper::save_checkpoint_without_optimizer(long long int step) -> std::string {
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
@@ -140,7 +139,7 @@ auto PolicyConvNetWrapper::save_checkpoint_without_optimizer(long long int step)
     return full_path;
 }
 
-void PolicyConvNetWrapper::load_checkpoint(const std::string &path) {
+void BinaryClassifierConvNetWrapper::load_checkpoint(const std::string &path) {
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))
         || !std::filesystem::exists(absl::StrCat(path, "-optimizer.pt")))
     {
@@ -151,7 +150,7 @@ void PolicyConvNetWrapper::load_checkpoint(const std::string &path) {
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
     torch::load(model_optimizer_, absl::StrCat(path, "-optimizer.pt"), torch_device_);
 }
-void PolicyConvNetWrapper::load_checkpoint_without_optimizer(const std::string &path) {
+void BinaryClassifierConvNetWrapper::load_checkpoint_without_optimizer(const std::string &path) {
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))) {
         const auto error_msg = std::format("path {:s} does not contain model", path);
         spdlog::error(error_msg);
@@ -160,7 +159,7 @@ void PolicyConvNetWrapper::load_checkpoint_without_optimizer(const std::string &
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
 }
 
-auto PolicyConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std::vector<InferenceOutput> {
+auto BinaryClassifierConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std::vector<InferenceOutput> {
     const int batch_size = static_cast<int>(batch.size());
 
     // Check for bad input
@@ -198,21 +197,15 @@ auto PolicyConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std:
 
     // Run inference
     auto model_output = model_->forward(input_observations);
-    const auto logits_output = model_output.logits.to(torch::kCPU);
-    const auto policy_output = torch::softmax(logits_output, 1);
-    const auto log_policy_output = torch::log_softmax(logits_output, 1);
+    const auto probs = torch::sigmoid(model_output.logits).to(torch::kCPU);
     std::vector<InferenceOutput> inference_output;
     for (int i = 0; i < batch_size; ++i) {
-        inference_output.emplace_back(
-            tensor_to_vec<double, float>(logits_output[i]),
-            tensor_to_vec<double, float>(policy_output[i]),
-            tensor_to_vec<double, float>(log_policy_output[i])
-        );
+        inference_output.emplace_back(probs[i].item<double>());
     }
     return inference_output;
 }
 
-auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
+auto BinaryClassifierConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
     const int batch_size = static_cast<int>(batch.size());
 
     // Check for bad input
@@ -226,12 +219,9 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
             spdlog::error(error_msg);
             throw std::logic_error(error_msg);
         }
-        if (batch_item.target_action < 0 || batch_item.target_action >= num_actions) [[unlikely]] {
-            const auto error_msg = std::format(
-                "Input action {:d} unexpected for number of action {:d}",
-                batch_item.target_action,
-                num_actions
-            );
+        if (batch_item.target_class < 0 || batch_item.target_class >= 2) [[unlikely]] {
+            const auto error_msg =
+                std::format("Input class {:d} unexpected for binary classification", batch_item.target_class);
             spdlog::error(error_msg);
             throw std::logic_error(error_msg);
         }
@@ -243,22 +233,19 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
     // Create tensor from raw flat array
     // torch::from_blob requires a pointer to non-const and doesn't take ownership
     torch::Tensor input_observations = torch::empty({batch_size, input_flat_size}, options_float);
-    torch::Tensor target_actions = torch::empty({batch_size, 1}, options_long);
-    torch::Tensor expandeds = torch::empty({batch_size, 1}, options_float);
+    torch::Tensor target_classes = torch::empty({batch_size, 1}, options_long);
 
     for (const auto &[idx, batch_item] : std::views::enumerate(batch)) {
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
         assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options_float);
-        assert(batch_item.target_action >= 0 && batch_item.target_action < num_actions);
-        target_actions[i] = batch_item.target_action;
-        expandeds[i] = static_cast<float>(batch_item.solution_expanded);
+        assert(batch_item.target_class >= 0 && batch_item.target_class < 2);
+        target_classes[i] = batch_item.target_class;
     }
 
     // Reshape to expected size for network (batch_size, flat) -> (batch_size, c, h, w)
     input_observations = input_observations.to(torch_device_);
-    target_actions = target_actions.to(torch_device_);
-    expandeds = expandeds.to(torch_device_);
+    target_classes = target_classes.to(torch::kFloat).to(torch_device_);
     input_observations = input_observations.reshape(
         {batch_size, config.observation_shape.c, config.observation_shape.h, config.observation_shape.w}
     );
@@ -270,8 +257,7 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
     // Get model output
     auto model_output = model_->forward(input_observations);
 
-    const torch::Tensor loss =
-        (expandeds * cross_entropy_loss(model_output.logits, target_actions, false).reshape({batch_size, -1})).mean();
+    torch::Tensor loss = torch::binary_cross_entropy_with_logits(model_output.logits, target_classes);
     auto loss_value = loss.item<double>();
 
     // Optimize model

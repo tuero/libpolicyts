@@ -1,0 +1,90 @@
+#include <libpolicyts/libpolicyts.h>
+
+#include <print>
+#include <ranges>
+#include <vector>
+
+// Policy + Heuristic which satisfies the constraint for rlts
+template <int N>
+struct PolicyAndHeuristic {
+    static_assert(N >= 1);
+    struct InferenceInput {
+        libpts::Observation obs;
+    };
+    struct InferenceOutput {
+        std::vector<double> policy;
+        double heuristic;
+    };
+
+    using InferenceInputs = std::vector<InferenceInput>;
+    [[nodiscard]] auto inference(InferenceInputs &observations) const -> std::vector<InferenceOutput> {
+        std::vector<InferenceOutput> inference_policies;
+        inference_policies.reserve(observations.size());
+        // Uniform policy over each action
+        // Heuristic value of 0
+        for ([[maybe_unused]] const auto &obs : observations) {
+            inference_policies.emplace_back(std::vector<double>(static_cast<std::size_t>(N), 1.0 / N), 0);
+        }
+        return inference_policies;
+    }
+};
+
+namespace rlts = libpts::algorithm::rlts;
+using SokobanState = libpts::env::SokobanState;
+using NodeT = rlts::Node<SokobanState>;
+
+// Simple rerooter which produces 0 weights everywhere
+// The RLTS algorithm will ensure the root gets a weight of 1
+struct SokobanRerooter {
+    void reset() {}
+    void init([[maybe_unused]] const NodeT &node) {}
+    void expanded([[maybe_unused]] const NodeT &node) {}
+    void generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
+    void prev_generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
+    auto operator()([[maybe_unused]] const NodeT &node) -> double {
+        return 0;
+    }
+    void batch_inferenced() {}
+    void solution_found([[maybe_unused]] const NodeT &node) {}
+};
+
+using SokobanPolicy = PolicyAndHeuristic<SokobanState::num_actions>;
+
+int main() {
+    constexpr auto problem_str =
+        "10|10|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|"
+        "01|01|01|01|01|01|01|01|01|01|01|01|00|01|01|01|01|01|01|01|01|01|02|01|01|01|01|01|01|01|01|04|04|02|03|01|"
+        "01|01|01|01|01|02|03|02|04|01|01|01|01|01|04|03|04|03|04|01|01|01|01|01|01|01|01|01|01|01";
+    constexpr int budget = 1e6;
+
+    auto start_state = SokobanState(problem_str);
+
+    std::shared_ptr<libpts::StopToken> stop_token = libpts::signal_installer();
+
+    rlts::SearchInput<SokobanState, SokobanPolicy, SokobanRerooter> search_input{
+        .puzzle_name = "puzzle_0",
+        .state = start_state,
+        .search_budget = budget,
+        .inference_batch_size = 1,
+        .mix_epsilon = 0.0,
+        .stop_token = stop_token,
+        .model = std::make_shared<SokobanPolicy>(),
+        .rerooter = SokobanRerooter{}
+    };
+
+    auto search_result = rlts::search(search_input);
+    // solution_path_states includes start and goal state
+    // solution_path_actions thus has 1 less item since its the actions between
+    if (search_result.solution_found) {
+        std::print("Starting state:\n{}\n", search_result.solution_path_states[0]);
+        for (auto &&[s, a] : std::views::zip(
+                 search_result.solution_path_states | std::views::drop(1),
+                 search_result.solution_path_actions
+             ))
+        {
+            std::print("Action taken: {}\n{}\n", a, s);
+        }
+    }
+
+    return 0;
+}

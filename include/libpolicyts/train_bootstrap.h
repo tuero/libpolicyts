@@ -96,10 +96,10 @@ concept IsLearningHandler = requires(
     std::vector<SearchOutput> &&results,
     std::mt19937 &rng
 ) {
-    { t.preprocess(batch, is_train) } -> std::same_as<void>;
-    { t.process_data(std::move(results)) } -> std::same_as<void>;
-    { t.learning_step(rng) } -> std::same_as<void>;
-    { t.checkpoint() } -> std::same_as<void>;
+    { t.preprocess(batch, is_train) } -> std::same_as<void>;    // Optionally preprocess before passing to the search
+    { t.process_data(std::move(results)) } -> std::same_as<void>;    // Process the search results into learning inputs
+    { t.learning_step(rng) } -> std::same_as<void>;                  // Perform a learning step
+    { t.checkpoint() } -> std::same_as<void>;                        // Checkpoint the model
 };
 
 // Concept for custom Problem Metrics
@@ -134,7 +134,7 @@ concept IsValidTracker = requires(
 
 enum class BootstrapPolicy {
     DOUBLE = 0,    // Doubling if no progress (this can be really slow!)
-    LTS_CM = 1     // Uses modfied version using X% percentage of progress
+    LTS_CM = 1     // Uses modified version using X% percentage of progress
 };
 
 // External flags -> enum support

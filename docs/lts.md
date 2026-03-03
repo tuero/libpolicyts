@@ -1,0 +1,131 @@
+# LevinTS
+
+LevinTS is a best-first search algorithm which uses the evaluation function $d/\pi$,
+where $d$ is the depth and $\pi$ is the path probability. 
+The evaluation function gives a bound on the search effort required to get to that node.
+- Orseau, Laurent, et al. "Single-agent policy tree search with guarantees." Advances in Neural Information Processing Systems 31 (2018).
+
+LevinTS needs as input a valid environment and model with policy evaluations.
+
+## Environment
+
+Environment objects need to support each of the following to satisfy the constraint
+- Supports standard equality and hash operators
+- `apply_action` updates the internal state by applying the action and returns the step cost
+- `get_observation` gets the flat state observation, as a vector of float
+- `get_hash` gets the hash of the underlying state
+- `is_solution` checks for a solution state
+- `is_terminal` checks for terminal non-solution states (this is often just calling `is_solution`)
+
+All the environments in `libpolicyts/env/` satisfies this concept.
+
+```cpp
+template <typename T>
+concept IsEnv = std::equality_comparable<T> && IsSTDHashable<T> && requires(T t, const T ct, const std::string &s) {
+    { t.apply_action(makeval<int>()) } -> std::same_as<double>;    // apply_action with int action and returns cost
+    { ct.get_observation() } -> std::same_as<Observation>;         // Observation for policy/heuristic inference
+    { ct.get_hash() } -> std::same_as<uint64_t>;                   // get hash
+    { ct.is_solution() } -> std::same_as<bool>;                    // Solution check
+    { ct.is_terminal() } -> std::same_as<bool>;                    // Terminal check (both solution + non-solution)
+    *(&T::num_actions) == makeval<int>();                          // Number of actions
+};
+```
+
+## Model
+
+Models which evaluate policies need to support each of the following to satisfy the constraint.
+- Has an inner type `InferenceInput`, which can be constructed from an `Observation`
+- `inference` takes a vector of `InferenceInput` and returns a vector of a struct such that it has an inner `std::vector<double> policy`.
+
+All of the provided model wrappers satisfies this concept.
+
+```cpp
+template <typename T>
+concept IsLTSModel = requires(T t) {
+    // Has an inner type called InferenceInput
+    typename T::InferenceInput;
+    // Which is constructable from an observation
+    requires std::is_constructible_v<typename T::InferenceInput, Observation>;
+    // Inference takes as input a vector of inference inputs and must return a std::vector<...>
+    requires IsSpecialization<
+        std::remove_cvref_t<decltype(t.inference(makeval<std::vector<typename T::InferenceInput> &>()))>,
+        std::vector>;
+    // Returned vector element type must satisfy HasPolicy
+    requires HasPolicy<typename std::remove_cvref_t<
+        decltype(t.inference(makeval<std::vector<typename T::InferenceInput> &>()))>::value_type>;
+};
+```
+
+## Example
+
+Full example in `examples/lts/`.
+
+```cpp
+// Policy which satisfies the constraint for levints
+template <int N>
+struct Policy {
+    static_assert(N >= 1);
+    struct InferenceInput {
+        libpts::Observation obs;
+    };
+    struct InferenceOutput {
+        std::vector<double> policy;
+    };
+
+    using InferenceInputs = std::vector<InferenceInput>;
+    [[nodiscard]] auto inference(InferenceInputs &observations) const -> std::vector<InferenceOutput> {
+        std::vector<InferenceOutput> inference_policies;
+        inference_policies.reserve(observations.size());
+        // Uniform policy over each action
+        for ([[maybe_unused]] const auto &obs : observations) {
+            inference_policies.emplace_back(std::vector<double>(static_cast<std::size_t>(N), 1.0 / N));
+        }
+        return inference_policies;
+    }
+};
+
+using State = ...
+namespace lts = libpts::algorithm::lts;
+lts::SearchInput<State, Policy<4>> search_input{
+    .puzzle_name = "puzzle_0",
+    .state = start_state,
+    .search_budget = 4000,
+    .inference_batch_size = 1,
+    .mix_epsilon = 0.0,
+    .stop_token = stop_token,
+    .model = std::make_shared<Policy>()
+};
+auto search_result = lts::search(search_input);
+```
+
+For an example using the library policy model,
+```cpp
+using Policy = libpts::model::PolicyConvNetWrapper;
+auto model_config = Policy::get_default_json_config();
+model_config["resnet_channels"] = 16;
+model_config["resnet_blocks"] = 2;
+model_config["policy_channels"] = 2;
+model_config["policy_mlp_layers"] = std::vector<int>{8, 8};
+model_config["use_batchnorm"] = false;
+model_config["learning_rate"] = 3e-4;
+model_config["l2_weight_decay"] = 1e-4;
+
+// Policy which satisfies the constraint for LTS
+auto model = std::make_shared<Policy>(
+    model_config,
+    start_state.observation_shape(),
+    start_state.num_actions,
+    "cpu",
+    ""
+);
+lts::SearchInput<State, Policy> search_input{
+    .puzzle_name = "puzzle_0",
+    .state = start_state,
+    .search_budget = 4000,
+    .inference_batch_size = 1,
+    .mix_epsilon = 0.0,
+    .stop_token = stop_token,
+    .model = std::make_shared<Policy>()
+};
+auto search_result = lts::search(search_input);
+```

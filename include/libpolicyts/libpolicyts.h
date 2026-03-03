@@ -3,6 +3,7 @@
 #include <libpolicyts/algorithm/lubyts.h>
 #include <libpolicyts/algorithm/multits.h>
 #include <libpolicyts/algorithm/phs.h>
+#include <libpolicyts/algorithm/rlts.h>
 #include <libpolicyts/cluster_graph.h>
 #include <libpolicyts/concepts.h>
 #include <libpolicyts/logging.h>
@@ -30,9 +31,9 @@
 // Torch dependent headers
 #ifdef LIBPTS_TORCH_FOUND
 #include <libpolicyts/model/base_model_wrapper.h>
-#include <libpolicyts/model/detail/heuristic_convnet.h>
+#include <libpolicyts/model/binary_classifier_convnet_wrapper.h>
+#include <libpolicyts/model/detail/convnet.h>
 #include <libpolicyts/model/detail/layers.h>
-#include <libpolicyts/model/detail/policy_convnet.h>
 #include <libpolicyts/model/detail/twoheaded_convnet.h>
 #include <libpolicyts/model/heuristic_convnet_wrapper.h>
 #include <libpolicyts/model/policy_convnet_wrapper.h>

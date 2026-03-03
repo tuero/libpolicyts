@@ -16,10 +16,10 @@ if(LIBPOLICYTS_BUILD_TORCH_SOURCES)
 target_sources(libpolicyts
     PRIVATE 
         model/base_model_wrapper.cpp
-        model/heuristic_convnet.cpp
+        model/binary_classifier_convnet_wrapper.cpp
         model/heuristic_convnet_wrapper.cpp
         model/layers.cpp
-        model/policy_convnet.cpp
+        model/convnet.cpp
         model/policy_convnet_wrapper.cpp
         model/twoheaded_convnet.cpp
         model/twoheaded_convnet_wrapper.cpp
