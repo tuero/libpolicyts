@@ -32,7 +32,8 @@ public:
     inline static const int num_actions = 4;
 
     explicit SokobanState(const std::string &board_str)
-        : state(board_str) {}
+        : state(board_str)
+    {}
     ~SokobanState() = default;
 
     SokobanState(const SokobanState &) noexcept = default;
@@ -41,7 +42,8 @@ public:
     auto operator=(SokobanState &&) noexcept -> SokobanState & = default;
 
     // Apply the action and return step cost
-    auto apply_action(int action) -> double {
+    auto apply_action(int action) -> double
+    {
         if (action < 0 || action >= num_actions) [[unlikely]] {
             const std::string error_msg =
                 std::format("Unknown action ({}), expected to be in range[0, {}]", action, num_actions - 1);
@@ -54,54 +56,64 @@ public:
     }
 
     // Get observation, which should be viewed as [C,H,W] = observation_shape()
-    [[nodiscard]] auto get_observation() const noexcept -> Observation {
+    [[nodiscard]] auto get_observation() const noexcept -> Observation
+    {
         return state.get_observation();
     }
 
     // The shape observations should be views as, in [C,H,W] format
-    [[nodiscard]] auto observation_shape() const noexcept -> ObservationShape {
+    [[nodiscard]] auto observation_shape() const noexcept -> ObservationShape
+    {
         return ObservationShape::from_array(state.observation_shape());
     }
 
     // Return true if state is a solutions state
-    [[nodiscard]] auto is_solution() const noexcept -> bool {
+    [[nodiscard]] auto is_solution() const noexcept -> bool
+    {
         return state.is_solution();
     }
 
     // Return true if state is terminal (can be solution or not)
-    [[nodiscard]] auto is_terminal() const noexcept -> bool {
+    [[nodiscard]] auto is_terminal() const noexcept -> bool
+    {
         return state.is_solution();
     }
 
     // Get heuristic (maybe uninformative)
-    [[nodiscard]] auto get_heuristic() const noexcept -> double {
+    [[nodiscard]] auto get_heuristic() const noexcept -> double
+    {
         return 0;
     }
 
     // Get hash of state
-    [[nodiscard]] auto get_hash() const noexcept -> uint64_t {
+    [[nodiscard]] auto get_hash() const noexcept -> uint64_t
+    {
         return state.get_hash();
     }
 
     // String representation of state
-    [[nodiscard]] auto to_str() const noexcept -> std::string {
+    [[nodiscard]] auto to_str() const noexcept -> std::string
+    {
         std::ostringstream ss;
         ss << state;
         return ss.str();
     }
 
     // State equality
-    [[nodiscard]] auto operator==(const SokobanState &rhs) const -> bool {
+    [[nodiscard]] auto operator==(const SokobanState &rhs) const -> bool
+    {
         return state == rhs.state;
     }
 
     // Query if events were completed at this step
     // Use an events mask which is a bitmask of the Event enumeration
-    [[nodiscard]] auto query_events(uint64_t events_mask) const noexcept -> bool {
+    [[nodiscard]] auto query_events(uint64_t events_mask) const noexcept -> bool
+    {
         return (reward_signal & events_mask) > 0;
     }
 
-    friend auto operator<<(std::ostream &os, const SokobanState &s) -> std::ostream & {
+    friend auto operator<<(std::ostream &os, const SokobanState &s) -> std::ostream &
+    {
         return os << s.state;
     }
 
@@ -117,14 +129,16 @@ private:
 // Hash and format support
 template <>
 struct std::hash<libpts::env::SokobanState> {
-    size_t operator()(const libpts::env::SokobanState &state) const {
+    size_t operator()(const libpts::env::SokobanState &state) const
+    {
         return state.get_hash();
     }
 };
 
 template <>
 struct std::formatter<libpts::env::SokobanState> : std::formatter<std::string> {
-    auto format(const libpts::env::SokobanState &s, format_context &ctx) const {
+    auto format(const libpts::env::SokobanState &s, format_context &ctx) const
+    {
         return formatter<string>::format(std::format("{}", s.state), ctx);
     }
 };

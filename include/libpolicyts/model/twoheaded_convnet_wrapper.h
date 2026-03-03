@@ -68,7 +68,8 @@ public:
     );
 
     // Get the default model config json with all required fields set
-    static auto get_default_json_config() -> nlohmann::json {
+    static auto get_default_json_config() -> nlohmann::json
+    {
         // NOLINTBEGIN(*-magic-numbers)
         return {
             {"model_type", name},

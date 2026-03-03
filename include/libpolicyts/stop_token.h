@@ -10,11 +10,13 @@ namespace libpts {
 
 class StopToken {
 public:
-    void stop() noexcept {
+    void stop() noexcept
+    {
         flag_ = true;
     }
 
-    [[nodiscard]] auto stop_requested() const noexcept -> bool {
+    [[nodiscard]] auto stop_requested() const noexcept -> bool
+    {
         return flag_;
     }
 

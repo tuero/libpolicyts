@@ -28,16 +28,19 @@ template <typename T>
 concept StringConstructable = requires(T t, const std::string &s) { T(s); };
 
 struct LoadProblemOptions {
-    auto num_threads(std::size_t _num_threads) -> LoadProblemOptions & {
+    auto num_threads(std::size_t _num_threads) -> LoadProblemOptions &
+    {
         num_threads_ = _num_threads;
         return *this;
     }
-    auto max_instances(std::size_t _max_instances) -> LoadProblemOptions & {
+    auto max_instances(std::size_t _max_instances) -> LoadProblemOptions &
+    {
         max_instances_ = _max_instances;
         return *this;
     }
     auto problem_str_modify_func(const std::function<std::string(std::string)> &_problem_str_modify_func)
-        -> LoadProblemOptions & {
+        -> LoadProblemOptions &
+    {
         problem_str_modify_func_ = _problem_str_modify_func;
         return *this;
     }
@@ -53,7 +56,8 @@ struct LoadProblemOptions {
  */
 template <StringConstructable T>
 [[nodiscard]] auto load_problems(const std::string &path, const LoadProblemOptions &options = LoadProblemOptions())
-    -> std::tuple<std::vector<T>, std::vector<std::string>> {
+    -> std::tuple<std::vector<T>, std::vector<std::string>>
+{
     std::vector<T> problems;
     std::vector<std::string> problem_strs;
     std::size_t problem_counter = 0;

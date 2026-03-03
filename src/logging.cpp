@@ -14,7 +14,8 @@
 
 namespace libpts {
 
-void init_loggers(bool console_only, const std::string &path, const std::string &postfix, bool erase_if_exists) {
+void init_loggers(bool console_only, const std::string &path, const std::string &postfix, bool erase_if_exists)
+{
     std::vector<spdlog::sink_ptr> sinks;
     sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
     if (!console_only) {
@@ -31,7 +32,8 @@ void init_loggers(bool console_only, const std::string &path, const std::string 
     spdlog::set_level(spdlog::level::debug);
 }
 
-void log_flags(int argc, char **argv) {
+void log_flags(int argc, char **argv)
+{
     std::vector<std::string> all_args_vec(argv, argv + argc);    // NOLINT (*-pointer-arithmetic)
     std::string all_args_str;
     for (const auto &s : all_args_vec) {
@@ -41,7 +43,8 @@ void log_flags(int argc, char **argv) {
     SPDLOG_INFO("Command used: {:s}", all_args_str);
 }
 
-void log_flush() {
+void log_flush()
+{
     auto logger = spdlog::get("name");
     if (!logger) {
         return;
@@ -49,7 +52,8 @@ void log_flush() {
     logger->flush();
 }
 
-void close_loggers() {
+void close_loggers()
+{
     spdlog::shutdown();
 }
 

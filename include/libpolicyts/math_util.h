@@ -48,7 +48,8 @@ void log_policy_noise_inplace(std::vector<double> &policy, double epsilon = 0);
  */
 template <typename T>
     requires std::is_integral_v<T>
-constexpr auto ceil_div(T x, T y) -> T {
+constexpr auto ceil_div(T x, T y) -> T
+{
     return (x + (y - 1)) / y;
 }
 

@@ -26,7 +26,8 @@ public:
      * @param num_threads Number of threads the pool should run
      */
     ThreadPool(int num_threads)
-        : num_threads_(static_cast<std::size_t>(num_threads)) {
+        : num_threads_(static_cast<std::size_t>(num_threads))
+    {
         if (num_threads <= 0) {
             throw std::invalid_argument("Expected at least one thread count");
         }
@@ -39,7 +40,8 @@ public:
      * @return Vector of results, in order of given jobs during construction
      */
     [[nodiscard]] auto run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs)
-        -> std::vector<OutputT> {
+        -> std::vector<OutputT>
+    {
         // Populate queue
         int id = -1;
         stop_requested_.store(false, std::memory_order_relaxed);
@@ -102,7 +104,8 @@ public:
      * @return Vector of results, in order of given jobs during construction
      */
     [[nodiscard]] auto run(std::function<OutputT(InputT)> func, const std::vector<InputT> &inputs, std::size_t workers)
-        -> std::vector<OutputT> {
+        -> std::vector<OutputT>
+    {
         std::size_t old_count = num_threads_;
         num_threads_ = workers;
         const auto results = run(func, inputs);
@@ -122,7 +125,8 @@ private:
     };
 
     // Runner for each thread, runs given function and pulls next item from input jobs if available
-    void thread_runner(std::function<OutputT(InputT)> func) {
+    void thread_runner(std::function<OutputT(InputT)> func)
+    {
         while (true) {
             // Stop early if another thread throws
             if (stop_requested_.load(std::memory_order_relaxed)) {

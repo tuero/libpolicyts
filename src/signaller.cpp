@@ -9,7 +9,8 @@
 namespace libpts {
 
 struct SignalHandler {
-    static void signal_handler([[maybe_unused]] int s) {
+    static void signal_handler([[maybe_unused]] int s)
+    {
         if (stop_token->stop_requested()) {
             std::exit(1);
         } else {
@@ -24,7 +25,8 @@ struct SignalHandler {
  * Create and install a signal handler
  * On SIGINT, token will request stop, and all objects storing it will call their exit code
  */
-std::shared_ptr<StopToken> signal_installer() {
+std::shared_ptr<StopToken> signal_installer()
+{
     std::signal(SIGINT, &SignalHandler::signal_handler);
     return SignalHandler::stop_token;
 }
@@ -33,7 +35,8 @@ std::shared_ptr<StopToken> signal_installer() {
  * Create and install a signal handler
  * On SIGINT, token will request stop, and all objects storing it will call their exit code
  */
-void signal_installer(std::shared_ptr<StopToken> stop_token) {
+void signal_installer(std::shared_ptr<StopToken> stop_token)
+{
     SignalHandler::stop_token = stop_token;
     std::signal(SIGINT, &SignalHandler::signal_handler);
 }

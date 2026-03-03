@@ -8,18 +8,21 @@
 
 namespace libpts {
 
-void ProblemMetrics::dump_header(std::ostream &os) {
+void ProblemMetrics::dump_header(std::ostream &os)
+{
     os << "iter,puzzle_name,solution_found,solution_cost,solution_prob,expanded,generated,"
           "time,budget\n";
 }
 
-auto operator<<(std::ostream &os, const ProblemMetrics &metrics_item) -> std::ostream & {
+auto operator<<(std::ostream &os, const ProblemMetrics &metrics_item) -> std::ostream &
+{
     os << metrics_item.iter << "," << metrics_item.puzzle_name << "," << metrics_item.solution_found << ","
        << metrics_item.solution_cost << "," << metrics_item.solution_prob << "," << metrics_item.expanded << ","
        << metrics_item.generated << "," << metrics_item.time << "," << metrics_item.budget << "\n";
     return os;
 }
-auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics {
+auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics
+{
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     // NOLINTBEGIN (*-magic-numbers)
     if (strs.size() != 9) {
@@ -42,15 +45,18 @@ auto ProblemMetrics::make_from_str(const std::string &str) -> ProblemMetrics {
 
 // ----------------------------
 
-void MemoryMetrics::dump_header(std::ostream &os) {
+void MemoryMetrics::dump_header(std::ostream &os)
+{
     os << "iter,max_rss\n";
 }
 
-auto operator<<(std::ostream &os, const MemoryMetrics &metrics_item) -> std::ostream & {
+auto operator<<(std::ostream &os, const MemoryMetrics &metrics_item) -> std::ostream &
+{
     os << metrics_item.iter << "," << metrics_item.max_rss << "\n";
     return os;
 }
-auto MemoryMetrics::make_from_str(const std::string &str) -> MemoryMetrics {
+auto MemoryMetrics::make_from_str(const std::string &str) -> MemoryMetrics
+{
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 2) {
         spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
@@ -61,15 +67,18 @@ auto MemoryMetrics::make_from_str(const std::string &str) -> MemoryMetrics {
 
 // ----------------------------
 
-void OutstandingMetrics::dump_header(std::ostream &os) {
+void OutstandingMetrics::dump_header(std::ostream &os)
+{
     os << "expansions,outstanding_problems\n";
 }
 
-auto operator<<(std::ostream &os, const OutstandingMetrics &metrics_item) -> std::ostream & {
+auto operator<<(std::ostream &os, const OutstandingMetrics &metrics_item) -> std::ostream &
+{
     os << metrics_item.expansions << "," << metrics_item.outstanding_problems << "\n";
     return os;
 }
-auto OutstandingMetrics::make_from_str(const std::string &str) -> OutstandingMetrics {
+auto OutstandingMetrics::make_from_str(const std::string &str) -> OutstandingMetrics
+{
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 2) {
         spdlog::error("Error reading line {:s}, {:d}", str, strs.size());
@@ -80,16 +89,19 @@ auto OutstandingMetrics::make_from_str(const std::string &str) -> OutstandingMet
 
 // ----------------------------
 
-void TimeMetrics::dump_header(std::ostream &os) {
+void TimeMetrics::dump_header(std::ostream &os)
+{
     os << "total_time_cpu,total_time_wall,outstanding_problems\n";
 }
 
-auto operator<<(std::ostream &os, const TimeMetrics &metrics_item) -> std::ostream & {
+auto operator<<(std::ostream &os, const TimeMetrics &metrics_item) -> std::ostream &
+{
     os << metrics_item.total_time_cpu << "," << metrics_item.total_time_wall << "," << metrics_item.outstanding_problems
        << "\n";
     return os;
 }
-auto TimeMetrics::make_from_str(const std::string &str) -> TimeMetrics {
+auto TimeMetrics::make_from_str(const std::string &str) -> TimeMetrics
+{
     auto strs = str | std::views::split(' ') | std::ranges::to<std::vector<std::string>>();
     if (strs.size() != 3) {
         spdlog::error("Error reading line {:s}, {:d}", str, strs.size());

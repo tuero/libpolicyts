@@ -36,7 +36,8 @@ namespace libpts::train {
  * @return Pair of train and validation sets
  */
 template <typename T>
-auto split_train_validate(std::vector<T> &items, std::size_t num_train, std::size_t num_validate, int seed) {
+auto split_train_validate(std::vector<T> &items, std::size_t num_train, std::size_t num_validate, int seed)
+{
     if (items.size() < num_train + num_validate) {
         SPDLOG_ERROR(
             "Input items {:d} is less than num_train {:d} + num_validate {:d}",
@@ -138,7 +139,8 @@ enum class BootstrapPolicy {
 };
 
 // External flags -> enum support
-inline auto AbslParseFlag(absl::string_view text, BootstrapPolicy *mode, std::string *error) -> bool {
+inline auto AbslParseFlag(absl::string_view text, BootstrapPolicy *mode, std::string *error) -> bool
+{
     if (text == "double") {
         *mode = BootstrapPolicy::DOUBLE;
         return true;
@@ -151,7 +153,8 @@ inline auto AbslParseFlag(absl::string_view text, BootstrapPolicy *mode, std::st
     return false;
 }
 
-inline auto AbslUnparseFlag(BootstrapPolicy mode) -> std::string {
+inline auto AbslUnparseFlag(BootstrapPolicy mode) -> std::string
+{
     switch (mode) {
     case BootstrapPolicy::DOUBLE:
         return "double";
@@ -191,7 +194,8 @@ void train_bootstrap(
     double bootstrap_factor = default_bootstrap_factor,
     int extra_iterations = 0,
     bool resume = false
-) {
+)
+{
     assert(stop_token);
     int bootstrap_iter = 0;
     int search_budget = initial_search_budget;

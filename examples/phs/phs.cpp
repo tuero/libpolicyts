@@ -17,7 +17,8 @@ struct PolicyAndHeuristic {
     };
 
     using InferenceInputs = std::vector<InferenceInput>;
-    [[nodiscard]] auto inference(InferenceInputs &observations) const -> std::vector<InferenceOutput> {
+    [[nodiscard]] auto inference(InferenceInputs &observations) const -> std::vector<InferenceOutput>
+    {
         std::vector<InferenceOutput> inference_policies;
         inference_policies.reserve(observations.size());
         // Uniform policy over each action
@@ -33,7 +34,8 @@ using SokobanState = libpts::env::SokobanState;
 using SokobanPolicy = PolicyAndHeuristic<SokobanState::num_actions>;
 namespace phs = libpts::algorithm::phs;
 
-int main() {
+int main()
+{
     constexpr auto problem_str =
         "10|10|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|"
         "01|01|01|01|01|01|01|01|01|01|01|01|00|01|01|01|01|01|01|01|01|01|02|01|01|01|01|01|01|01|01|04|04|02|03|01|"

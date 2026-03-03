@@ -88,7 +88,8 @@ void test_runner(
     int max_iterations,
     double time_budget,
     std::string export_suffix
-) {
+)
+{
     assert(stop_token);
     int bootstrap_iter = 0;
     int64_t total_expansions = 0;

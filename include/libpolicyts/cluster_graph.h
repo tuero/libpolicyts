@@ -55,7 +55,8 @@ public:
      * @param max_paths Maximum number of paths to sample
      */
     auto sample_undirected_paths(int cluster_level, std::mt19937_64 &rng, int max_paths) const
-        -> std::vector<std::vector<int>> {
+        -> std::vector<std::vector<int>>
+    {
         assert(igraph_data);
         return sample_paths(&igraph_data->stg, cluster_level, rng, max_paths);
     }
@@ -67,7 +68,8 @@ public:
      * @param max_paths Maximum number of paths to sample
      */
     [[nodiscard]] auto sample_directed_paths(int cluster_level, std::mt19937_64 &rng, int max_paths) const
-        -> std::vector<std::vector<int>> {
+        -> std::vector<std::vector<int>>
+    {
         assert(igraph_data);
         return sample_paths(&igraph_data->d_stg, cluster_level, rng, max_paths);
     }
@@ -78,7 +80,8 @@ public:
      * @param cluster_level The cluster level
      * @return The cluster id
      */
-    [[nodiscard]] constexpr auto get_cluster_id(int vertex_idx, int cluster_level) const -> std::size_t {
+    [[nodiscard]] constexpr auto get_cluster_id(int vertex_idx, int cluster_level) const -> std::size_t
+    {
         assert(igraph_data);
         if (cluster_level < 0 || cluster_level >= hierarchy_size()) {
             spdlog::error("Unknown cluster level {:d} for range {:d}", cluster_level, hierarchy_size() - 1);
@@ -98,19 +101,22 @@ public:
     }
 
     // Number of vertices in the base graph
-    [[nodiscard]] auto num_vertices() const -> int {
+    [[nodiscard]] auto num_vertices() const -> int
+    {
         assert(igraph_data);
         return static_cast<int>(igraph_vcount(&igraph_data->stg));
     }
 
     // Number of edges in the base graph
-    [[nodiscard]] auto num_edges() const -> int {
+    [[nodiscard]] auto num_edges() const -> int
+    {
         assert(igraph_data);
         return static_cast<int>(igraph_ecount(&igraph_data->stg));
     }
 
     // Number of louvain hierarchy levels
-    [[nodiscard]] auto hierarchy_size() const -> int {
+    [[nodiscard]] auto hierarchy_size() const -> int
+    {
         assert(igraph_data);
         assert(igraph_data->cluster_graphs.size() == igraph_data->cluster_memberships.size());
         return static_cast<int>(igraph_data->cluster_graphs.size());
@@ -121,7 +127,8 @@ public:
      * @param cluster_level The cluster level
      * @return Number of clusters
      */
-    [[nodiscard]] auto num_clusters(int cluster_level) const -> int {
+    [[nodiscard]] auto num_clusters(int cluster_level) const -> int
+    {
         assert(igraph_data);
         if (cluster_level < 0 || cluster_level >= hierarchy_size()) {
             spdlog::error("Unknown cluster level {:d} for range {:d}", cluster_level, hierarchy_size() - 1);
@@ -134,7 +141,8 @@ public:
      * Get the number of clusters (nodes) at all cluster levels
      * @return Number of clusters
      */
-    [[nodiscard]] auto num_clusters() const -> std::vector<int> {
+    [[nodiscard]] auto num_clusters() const -> std::vector<int>
+    {
         assert(igraph_data);
         return igraph_data->cluster_graphs
                | std::views::transform([](const igraph_t &g) -> int { return static_cast<int>(igraph_vcount(&g)); })

@@ -37,7 +37,8 @@ template <IsEnv EnvT, IsLTSModel ModelT>
 using LTS = phs::detail::PHS<EnvT, ModelT>;
 
 template <IsEnv EnvT, IsLTSModel ModelT>
-auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
+auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT>
+{
     TimerWall timer(-1);
     LTS<EnvT, ModelT> step_lts(input);
     step_lts.init();

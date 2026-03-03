@@ -17,13 +17,16 @@ BaseModelWrapper::BaseModelWrapper(
       checkpoint_base_name_(
           checkpoint_base_name.empty() ? checkpoint_base_name : absl::StrCat(checkpoint_base_name, "-")
       ),
-      torch_device_(device) {}
+      torch_device_(device)
+{}
 
-void BaseModelWrapper::load_checkpoint(long long int step) {
+void BaseModelWrapper::load_checkpoint(long long int step)
+{
     load_checkpoint(absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step));
 }
 
-void BaseModelWrapper::load_checkpoint_without_optimizer(long long int step) {
+void BaseModelWrapper::load_checkpoint_without_optimizer(long long int step)
+{
     load_checkpoint_without_optimizer(absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step));
 }
 

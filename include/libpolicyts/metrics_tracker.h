@@ -75,7 +75,8 @@ class MetricsTracker {
 public:
     MetricsTracker() = delete;
     MetricsTracker(const std::string &export_path, const std::string &file_name, bool resume = false)
-        : full_path((std::format("{:s}/{:s}.csv", export_path, file_name))) {
+        : full_path((std::format("{:s}/{:s}.csv", export_path, file_name)))
+    {
         // create directory for metrics
         if (std::filesystem::exists(full_path)) {
             if (resume) {
@@ -97,20 +98,24 @@ public:
         save_header();
     }
 
-    void save_header() {
+    void save_header()
+    {
         std::ofstream export_file(full_path, std::ofstream::app | std::ofstream::out);
         MetricsItem::dump_header(export_file);
     }
 
-    void add_row(MetricsItem &&metrics_item) noexcept {
+    void add_row(MetricsItem &&metrics_item) noexcept
+    {
         rows.push_back(std::move(metrics_item));
     }
 
-    void clear() noexcept {
+    void clear() noexcept
+    {
         rows.clear();
     }
 
-    void save() noexcept {
+    void save() noexcept
+    {
         if (rows.empty()) {
             return;
         }
@@ -126,11 +131,13 @@ public:
         rows.clear();
     }
 
-    auto get_rows() -> const std::vector<MetricsItem> {
+    auto get_rows() -> const std::vector<MetricsItem>
+    {
         return rows;
     }
 
-    auto size() -> int {
+    auto size() -> int
+    {
         return static_cast<int>(rows.size());
     }
 

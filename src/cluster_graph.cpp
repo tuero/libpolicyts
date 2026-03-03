@@ -20,14 +20,16 @@
 namespace libpts::clustering {
 
 namespace {
-auto aggregate_partition(RBConfigurationVertexPartition &partition) -> std::unique_ptr<RBConfigurationVertexPartition> {
+auto aggregate_partition(RBConfigurationVertexPartition &partition) -> std::unique_ptr<RBConfigurationVertexPartition>
+{
     Graph *collapsed_graph = partition.get_graph()->collapse_graph(&partition);
     RBConfigurationVertexPartition *collapsed_partition = partition.create(collapsed_graph);
     collapsed_partition->destructor_delete_graph = true;
     return std::unique_ptr<RBConfigurationVertexPartition>(collapsed_partition);
 }
 
-auto cluster_graph_from_partition(RBConfigurationVertexPartition *partition) -> igraph_t {
+auto cluster_graph_from_partition(RBConfigurationVertexPartition *partition) -> igraph_t
+{
     assert(partition);
     const igraph_t *g = partition->get_graph()->get_igraph();
     igraph_t cluster_graph;
@@ -36,7 +38,8 @@ auto cluster_graph_from_partition(RBConfigurationVertexPartition *partition) -> 
     return cluster_graph;
 }
 
-auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
+auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int>
+{
     assert(g);
     // First check distance if < INF (otherwise igraph will report warning on non-paths)
     igraph_matrix_t m;
@@ -67,7 +70,8 @@ auto get_path(const igraph_t *g, int vid_from, int vid_to) -> std::vector<int> {
 }    // namespace
 
 namespace detail {
-IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges) {
+IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges)
+{
     std::vector<igraph_int_t> edge_vec = edges
                                          | std::views::transform([](auto v) { return static_cast<igraph_int_t>(v); })
                                          | std::ranges::to<std::vector>();
@@ -100,13 +104,15 @@ IGraphData::IGraphData(int num_vertices, const std::vector<int> &edges) {
     igraph_simplify(&stg, true, true, nullptr);
 }
 
-IGraphData::~IGraphData() {
+IGraphData::~IGraphData()
+{
     clear_cluster_graphs();
     igraph_destroy(&stg);
     igraph_destroy(&d_stg);
 }
 
-void IGraphData::clear_cluster_graphs() {
+void IGraphData::clear_cluster_graphs()
+{
     for (auto &cluster_graph : cluster_graphs) {
         igraph_destroy(&cluster_graph);
     }
@@ -115,11 +121,13 @@ void IGraphData::clear_cluster_graphs() {
 }    // namespace detail
 
 ClusterGraphs::ClusterGraphs(int num_vertices, const std::vector<int> &edges, std::size_t seed, double resolution)
-    : igraph_data(std::make_unique<detail::IGraphData>(num_vertices, edges)) {
+    : igraph_data(std::make_unique<detail::IGraphData>(num_vertices, edges))
+{
     louvain(seed, resolution);
 }
 
-void ClusterGraphs::louvain(std::size_t seed, double resolution) {
+void ClusterGraphs::louvain(std::size_t seed, double resolution)
+{
     assert(igraph_data);
     Graph graph(&igraph_data->stg);
     RBConfigurationVertexPartition partition(&graph, resolution);
@@ -167,7 +175,8 @@ auto ClusterGraphs::sample_paths(
     int cluster_level,
     std::mt19937_64 &rng,
     int max_paths
-) const -> std::vector<std::vector<int>> {
+) const -> std::vector<std::vector<int>>
+{
     assert(base_graph);
     if (cluster_level < 0 || cluster_level >= hierarchy_size()) {
         spdlog::error("Unknown cluster level {:d} for range {:d}", cluster_level, hierarchy_size() - 1);

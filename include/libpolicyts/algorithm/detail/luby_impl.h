@@ -103,7 +103,8 @@ auto sample_trajectory(
     int depth,
     double epsilon,
     std::mt19937 &rng
-) {
+)
+{
     assert(policy_model);
     double g = 0;
     double log_p = 0;
@@ -179,7 +180,8 @@ auto sample_trajectory(
 }
 
 template <IsEnv EnvT, IsLubyModel PolicyModelT, IsDepthModel DepthModelT>
-auto search(const SearchInput<EnvT, PolicyModelT> &input, DepthModelT depth_model) -> SearchOutput<EnvT> {
+auto search(const SearchInput<EnvT, PolicyModelT> &input, DepthModelT depth_model) -> SearchOutput<EnvT>
+{
     SearchOutput<EnvT> output{.puzzle_name = input.puzzle_name};
     std::mt19937 rng(static_cast<std::mt19937::result_type>(input.seed));
     TimerWall timer(-1);

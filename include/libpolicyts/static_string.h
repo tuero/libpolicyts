@@ -13,7 +13,8 @@ template <std::size_t N>
 struct StaticString {
     std::array<char, N + 1> data = {};
 
-    constexpr StaticString(const char (&input)[N + 1]) {    // NOLINT(*-avoid-c-arrays)
+    constexpr StaticString(const char (&input)[N + 1])    // NOLINT(*-avoid-c-arrays)
+    {
         std::ranges::copy_n(input, N + 1, data.begin());
     }
 };

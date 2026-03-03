@@ -9,7 +9,8 @@ using SokobanState = libpts::env::SokobanState;
 using SokobanPolicy = libpts::model::TwoHeadedConvNetWrapper;
 namespace phs = libpts::algorithm::phs;
 
-int main() {
+int main()
+{
     constexpr auto problem_str =
         "10|10|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|"
         "01|01|01|01|01|01|01|01|01|01|01|01|00|01|01|01|01|01|01|01|01|01|02|01|01|01|01|01|01|01|01|04|04|02|03|01|"

@@ -20,7 +20,8 @@ namespace libpts::model {
  * Initialize torch reproducibility
  * @param seed The seed to initialize torch rngs
  */
-inline void init_torch(uint64_t seed) {
+inline void init_torch(uint64_t seed)
+{
     // Set torch seed
     torch::manual_seed(seed);
     torch::globalContext().setDeterministicAlgorithms(true, false);

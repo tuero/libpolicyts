@@ -111,10 +111,12 @@ template <IsEnv EnvT>
 struct Node {
     Node() = delete;
     Node(const EnvT &state_)
-        : state(state_) {}
+        : state(state_)
+    {}
 
     // Apply action, set parent and costs
-    void apply_action(const Node<EnvT> *par, int a) {
+    void apply_action(const Node<EnvT> *par, int a)
+    {
         assert(par);
         parent = par;
         auto c = state.apply_action(a);
@@ -125,34 +127,40 @@ struct Node {
 
     struct Hasher {
         using is_transparent = void;
-        std::size_t operator()(const Node &node) const {
+        std::size_t operator()(const Node &node) const
+        {
             return node.state.get_hash();
         }
-        auto operator()(const Node *node) const -> std::size_t {
+        auto operator()(const Node *node) const -> std::size_t
+        {
             assert(node);
             return node->state.get_hash();
         }
     };
     struct CompareEqual {
         using is_transparent = void;
-        bool operator()(const Node &lhs, const Node &rhs) const {
+        bool operator()(const Node &lhs, const Node &rhs) const
+        {
             return lhs.state == rhs.state;
         }
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+        auto operator()(const Node *lhs, const Node *rhs) const -> bool
+        {
             assert(lhs);
             assert(rhs);
             return lhs->state == rhs->state;
         }
     };
     struct CompareOrderedLess {
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+        auto operator()(const Node *lhs, const Node *rhs) const -> bool
+        {
             assert(lhs);
             assert(rhs);
             return lhs->cost < rhs->cost;
         }
     };
     struct CompareOrderedGreater {
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+        auto operator()(const Node *lhs, const Node *rhs) const -> bool
+        {
             assert(lhs);
             assert(rhs);
             return lhs->cost > rhs->cost;
@@ -172,7 +180,8 @@ struct Node {
 };
 
 // PHS cost
-static constexpr double phs_cost(double log_p, double g, double h) {
+static constexpr double phs_cost(double log_p, double g, double h)
+{
     h = (h < 0) ? 0 : h;
     return g == 0 ? 0 : std::log(h + g + EPS) - (log_p * (1.0 + (h / g)));
 }
@@ -195,7 +204,8 @@ class PHS {
 
 public:
     PHS(const SearchInput<EnvT, ModelT> &input_problem)
-        : input(input_problem), status(Status::INIT), model(input.model) {
+        : input(input_problem), status(Status::INIT), model(input.model)
+    {
         if (!model) {
             SPDLOG_ERROR("PHS requires a non-null model - name: {:s}.", input.puzzle_name);
             throw std::logic_error("PHS requires a non-null model.");
@@ -204,7 +214,8 @@ public:
     }
 
     // Initialize the search with root node inference output
-    void init() {
+    void init()
+    {
         if (status != Status::INIT) {
             spdlog::error("Coroutine needs to be reset() before calling init()");
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
@@ -223,7 +234,8 @@ public:
     PHS(PHS &&) = delete;
     auto operator=(PHS &&) -> PHS & = delete;
 
-    void reset() {
+    void reset()
+    {
         status = Status::INIT;
         timeout = false;
         search_output = SearchOutput<EnvT>{.puzzle_name = input.puzzle_name};
@@ -237,7 +249,8 @@ public:
         generated_nodes.clear();
     }
 
-    void step() {
+    void step()
+    {
         if (open.empty()) {
             status = Status::ERROR;
             spdlog::error("Exhausted open list - name: {:s}, budget: {:d}.", input.puzzle_name, input.search_budget);
@@ -314,16 +327,19 @@ public:
         }
     }
 
-    [[nodiscard]] auto get_status() const -> Status {
+    [[nodiscard]] auto get_status() const -> Status
+    {
         return status;
     }
 
-    [[nodiscard]] auto get_search_output() const -> SearchOutput<EnvT> {
+    [[nodiscard]] auto get_search_output() const -> SearchOutput<EnvT>
+    {
         return search_output;
     }
 
 private:
-    void batch_predict() {
+    void batch_predict()
+    {
         if (inference_nodes.empty()) {
             return;
         }
@@ -373,7 +389,8 @@ private:
     }
 
     // Walk backwards up until the root, setting data
-    void set_solution_trajectory(const NodeT &node) {
+    void set_solution_trajectory(const NodeT &node)
+    {
         double solution_cost = 0;
         auto current = &node;
         search_output.solution_found = true;

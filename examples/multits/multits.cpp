@@ -12,7 +12,8 @@ struct Policy {
         std::vector<double> policy;
     };
 
-    [[nodiscard]] auto inference([[maybe_unused]] libpts::Observation &observations) const -> InferenceOutput {
+    [[nodiscard]] auto inference([[maybe_unused]] libpts::Observation &observations) const -> InferenceOutput
+    {
         return {std::vector<double>(static_cast<std::size_t>(N), 1.0 / N)};
     }
 };
@@ -21,7 +22,8 @@ using SokobanState = libpts::env::SokobanState;
 using SokobanPolicy = Policy<SokobanState::num_actions>;
 namespace multits = libpts::algorithm::multits;
 
-int main() {
+int main()
+{
     constexpr auto problem_str =
         "10|10|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|01|"
         "01|01|01|01|01|01|01|01|01|01|01|01|00|01|01|01|01|01|01|01|01|01|02|01|01|01|01|01|01|01|01|04|04|02|03|01|"

@@ -23,13 +23,15 @@ template <typename T>
 concept IsLubyModel = detail::IsLubyModel<T>;
 
 // Depth model
-constexpr auto A006519(int n) -> int {
+constexpr auto A006519(int n) -> int
+{
     return ((n ^ (n - 1)) + 1) / 2;
 }
 
 // Depths follow A006519 sequence
 struct LubyDepthModel {
-    auto operator()(int iter, [[maybe_unused]] Observation &obs) -> int {
+    auto operator()(int iter, [[maybe_unused]] Observation &obs) -> int
+    {
         return A006519(iter);
     }
 };
@@ -51,7 +53,8 @@ template <IsEnv EnvT>
 using SearchOutput = detail::SearchOutput<EnvT>;
 
 template <IsEnv EnvT, IsLubyModel ModelT>
-auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
+auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT>
+{
     detail::SearchInput<EnvT, ModelT> search_input{
         .puzzle_name = input.puzzle_name,
         .state = input.state,

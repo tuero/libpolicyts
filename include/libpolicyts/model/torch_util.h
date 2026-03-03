@@ -22,7 +22,8 @@ namespace libpts::model {
  * @return std vector of tensor values
  */
 template <typename OutT, typename InT>
-auto tensor_to_vec(torch::Tensor x) -> std::vector<OutT> {
+auto tensor_to_vec(torch::Tensor x) -> std::vector<OutT>
+{
     const auto cx = x.contiguous();
     auto ptr = cx.data_ptr<InT>();
     std::vector<OutT> data;
@@ -40,8 +41,8 @@ auto tensor_to_vec(torch::Tensor x) -> std::vector<OutT> {
  * @param reduce Flag to mean reduce
  * @return Tensor loss
  */
-inline auto cross_entropy_loss(torch::Tensor logits, torch::Tensor target_actions, bool reduce = true)
-    -> torch::Tensor {
+inline auto cross_entropy_loss(torch::Tensor logits, torch::Tensor target_actions, bool reduce = true) -> torch::Tensor
+{
     if (target_actions.dim() > 1) {
         target_actions = target_actions.flatten();
     }
@@ -56,11 +57,13 @@ inline auto cross_entropy_loss(torch::Tensor logits, torch::Tensor target_action
  * @param reduce Flag to mean reduce
  * @return Tensor loss
  */
-inline auto mean_squared_error_loss(torch::Tensor output, torch::Tensor target, bool reduce = true) -> torch::Tensor {
+inline auto mean_squared_error_loss(torch::Tensor output, torch::Tensor target, bool reduce = true) -> torch::Tensor
+{
     return torch::mse_loss(output, target, reduce ? at::Reduction::Mean : at::Reduction::None);
 }
 
-inline void init_model(torch::nn::Module &module) {
+inline void init_model(torch::nn::Module &module)
+{
     torch::NoGradGuard no_grad;
     if (auto *linear = module.as<torch::nn::Linear>()) {
         torch::nn::init::kaiming_normal_(linear->weight, 0, torch::kFanIn, torch::kReLU);

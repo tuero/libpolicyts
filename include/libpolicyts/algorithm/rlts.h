@@ -144,7 +144,8 @@ enum class CostMode {
 };
 
 // External flags -> enum support
-inline auto AbslParseFlag(absl::string_view text, CostMode *cost_mode, std::string *error) -> bool {
+inline auto AbslParseFlag(absl::string_view text, CostMode *cost_mode, std::string *error) -> bool
+{
     if (text == "slenderness") {
         *cost_mode = CostMode::Slenderness;
         return true;
@@ -157,7 +158,8 @@ inline auto AbslParseFlag(absl::string_view text, CostMode *cost_mode, std::stri
     return false;
 }
 
-inline auto AbslUnparseFlag(CostMode cost_mode) -> std::string {
+inline auto AbslUnparseFlag(CostMode cost_mode) -> std::string
+{
     switch (cost_mode) {
     case CostMode::Slenderness:
         return "slenderness";
@@ -231,7 +233,8 @@ struct RLTSMetrics {
     double log_bound_simplified;        // (Corollary 12)
     double log_bound_trivial;
 
-    static auto make_from_str(const std::string &str) -> RLTSMetrics {
+    static auto make_from_str(const std::string &str) -> RLTSMetrics
+    {
         std::vector<std::string> strs = absl::StrSplit(str, ',');
         // NOLINTBEGIN (*-magic-numbers)
         if (strs.size() != 15) {
@@ -257,7 +260,8 @@ struct RLTSMetrics {
         };
         // NOLINTEND
     }
-    static void dump_header(std::ostream &os) {
+    static void dump_header(std::ostream &os)
+    {
         os << "iter,";
         os << "puzzle_name,";
         os << "solution_found,";
@@ -274,7 +278,8 @@ struct RLTSMetrics {
         os << "log_bound_simplified,";
         os << "log_bound_trivial\n";
     }
-    friend auto operator<<(std::ostream &os, const RLTSMetrics &metrics_item) -> std::ostream & {
+    friend auto operator<<(std::ostream &os, const RLTSMetrics &metrics_item) -> std::ostream &
+    {
         os << metrics_item.iter << ",";
         os << metrics_item.puzzle_name << ",";
         os << metrics_item.solution_found << ",";
@@ -301,11 +306,13 @@ struct RLTSMetricsTrackerBase {
 
     RLTSMetricsTrackerBase() = delete;
     RLTSMetricsTrackerBase(const std::string &export_path, const std::string &file_name, bool resume = false)
-        : full_path_general((std::format("{:s}/{:s}.csv", export_path, file_name))) {
+        : full_path_general((std::format("{:s}/{:s}.csv", export_path, file_name)))
+    {
         init_file(full_path_general, rows_general, export_path, resume);
     }
 
-    void save_header_general() {
+    void save_header_general()
+    {
         std::ofstream export_file(full_path_general, std::ofstream::app | std::ofstream::out);
         RLTSMetrics::dump_header(export_file);
     }
@@ -315,7 +322,8 @@ struct RLTSMetricsTrackerBase {
         const SearchOutput<EnvT, RerooterSearchOutputT> &search_output,
         int bootstrap_iter,
         int search_budget
-    ) {
+    )
+    {
         rows_general.push_back({
             .iter = bootstrap_iter,
             .puzzle_name = search_output.puzzle_name,
@@ -335,11 +343,13 @@ struct RLTSMetricsTrackerBase {
         });
     }
 
-    void clear_general() noexcept {
+    void clear_general() noexcept
+    {
         rows_general.clear();
     }
 
-    void save_general() noexcept {
+    void save_general() noexcept
+    {
         if (rows_general.empty()) {
             return;
         }
@@ -353,18 +363,21 @@ struct RLTSMetricsTrackerBase {
         rows_general.clear();
     }
 
-    auto get_rows() -> const std::vector<RLTSMetrics> & {
+    auto get_rows() -> const std::vector<RLTSMetrics> &
+    {
         return rows_general;
     }
 
-    auto size() -> int {
+    auto size() -> int
+    {
         return static_cast<int>(rows_general.size());
     }
 
 protected:
     template <typename T>
     static void
-        init_file(const std::string &full_path, std::vector<T> &rows, const std::string &export_path, bool resume) {
+        init_file(const std::string &full_path, std::vector<T> &rows, const std::string &export_path, bool resume)
+    {
         if (std::filesystem::exists(full_path)) {
             if (resume) {
                 std::ifstream export_file(full_path);
@@ -394,11 +407,13 @@ template <typename EnvT>
 struct RLTSMetricsTracker<EnvT, detail::NoRerooterSearchOutput> : RLTSMetricsTrackerBase<EnvT> {
     RLTSMetricsTracker() = delete;
     RLTSMetricsTracker(const std::string &export_path, const std::string &file_name, bool resume = false)
-        : RLTSMetricsTrackerBase<EnvT>(export_path, file_name, resume) {
+        : RLTSMetricsTrackerBase<EnvT>(export_path, file_name, resume)
+    {
         this->save_header_general();
     }
 
-    void save_header() {
+    void save_header()
+    {
         this->save_header_general();
     }
 
@@ -406,15 +421,18 @@ struct RLTSMetricsTracker<EnvT, detail::NoRerooterSearchOutput> : RLTSMetricsTra
         const SearchOutput<EnvT, detail::NoRerooterSearchOutput> &search_output,
         int bootstrap_iter,
         int search_budget
-    ) {
+    )
+    {
         this->add_row_general(search_output, bootstrap_iter, search_budget);
     }
 
-    void clear() noexcept {
+    void clear() noexcept
+    {
         this->clear_general();
     }
 
-    void save() noexcept {
+    void save() noexcept
+    {
         this->save_general();
     }
 };
@@ -433,12 +451,14 @@ struct RLTSMetricsTracker<EnvT, RerooterSearchOutput> : RLTSMetricsTrackerBase<E
     RLTSMetricsTracker() = delete;
     RLTSMetricsTracker(const std::string &export_path, const std::string &file_name, bool resume = false)
         : RLTSMetricsTrackerBase<EnvT>(export_path, file_name, resume),
-          full_path_weight((std::format("{:s}/{:s}_w.csv", export_path, file_name))) {
+          full_path_weight((std::format("{:s}/{:s}_w.csv", export_path, file_name)))
+    {
         this->init_file(full_path_weight, rows_rerooter, export_path, resume);
         save_header();
     }
 
-    void save_header() {
+    void save_header()
+    {
         this->save_header_general();
         std::ofstream export_file(full_path_weight, std::ofstream::app | std::ofstream::out);
         RerooterMetrics::dump_header(export_file);
@@ -448,19 +468,22 @@ struct RLTSMetricsTracker<EnvT, RerooterSearchOutput> : RLTSMetricsTrackerBase<E
         const SearchOutput<EnvT, RerooterSearchOutput> &search_output,
         int bootstrap_iter,
         int search_budget
-    ) {
+    )
+    {
         this->add_row_general(search_output, bootstrap_iter, search_budget);
         rows_rerooter.append_range(
             search_output.rerooter_search_output.to_metric_items(bootstrap_iter, search_output.puzzle_name)
         );
     }
 
-    void clear() noexcept {
+    void clear() noexcept
+    {
         this->clear_general();
         rows_rerooter.clear();
     }
 
-    void save() noexcept {
+    void save() noexcept
+    {
         if (this->rows_general.empty() && rows_rerooter.empty()) {
             return;
         }
@@ -486,7 +509,8 @@ constexpr double EPS = 1e-12;
 // If idx_start == idx_end, then the subrange is empty
 // If idx_end not provided, by default we take until the end
 constexpr auto
-    make_subrange(const std::vector<double> &items, int idx_start, const std::optional<int> &idx_end = std::nullopt) {
+    make_subrange(const std::vector<double> &items, int idx_start, const std::optional<int> &idx_end = std::nullopt)
+{
     int _idx_end = idx_end.value_or(static_cast<int>(items.size()));
     assert(idx_start >= 0 && idx_start <= static_cast<int>(items.size()));
     assert(_idx_end >= 0 && _idx_end <= static_cast<int>(items.size()));
@@ -497,7 +521,8 @@ constexpr auto
 // Sum a range
 template <typename T>
     requires std::ranges::range<T>
-constexpr auto sum_range(T &&range) {
+constexpr auto sum_range(T &&range)
+{
     return std::ranges::fold_left(std::forward<T>(range), 0.0, std::plus<>{});
 }
 
@@ -507,7 +532,8 @@ constexpr auto log_slenderness_cost_function(
     const std::vector<double> &path_log_probs,
     int idx_start,
     const std::optional<int> &idx_end = std::nullopt
-) -> double {
+) -> double
+{
     double c = 1.0;
     auto sub_path_log_probs_view = make_subrange(path_log_probs, idx_start, idx_end);
     for (double lp : sub_path_log_probs_view) {
@@ -517,7 +543,8 @@ constexpr auto log_slenderness_cost_function(
 }
 
 // log of (d(n) - d(n_k)) / pi(n | n_k)
-constexpr auto log_d_pi_cost(const std::vector<double> &path_log_probs, int idx_start) -> double {
+constexpr auto log_d_pi_cost(const std::vector<double> &path_log_probs, int idx_start) -> double
+{
     assert(static_cast<std::size_t>(idx_start) < path_log_probs.size());
     return std::log(static_cast<double>(static_cast<int>(path_log_probs.size()) - idx_start))
            - sum_range(make_subrange(path_log_probs, idx_start));
@@ -528,9 +555,11 @@ template <IsEnv EnvT>
 struct Node {
     Node() = delete;
     Node(const EnvT &state_)
-        : state(state_) {}
+        : state(state_)
+    {}
 
-    void apply_action(const Node<EnvT> *current, double c, int a) {
+    void apply_action(const Node<EnvT> *current, double c, int a)
+    {
         parent = current;
         state.apply_action(a);
         double local_log_p = current->action_log_prob[static_cast<std::size_t>(a)];
@@ -549,7 +578,8 @@ struct Node {
         action = a;
     }
 
-    void set_cost(CostMode cost_mode) {
+    void set_cost(CostMode cost_mode)
+    {
         assert(path_weights.size() == path_cumulative_weights.size());
 
         // Root base case
@@ -582,24 +612,29 @@ struct Node {
 
     struct Hasher {
         using is_transparent = void;
-        std::size_t operator()(const Node &node) const {
+        std::size_t operator()(const Node &node) const
+        {
             return node.state.get_hash();
         }
-        auto operator()(const Node *node) const -> std::size_t {
+        auto operator()(const Node *node) const -> std::size_t
+        {
             return node->state.get_hash();
         }
     };
     struct CompareEqual {
         using is_transparent = void;
-        bool operator()(const Node &lhs, const Node &rhs) const {
+        bool operator()(const Node &lhs, const Node &rhs) const
+        {
             return lhs.state == rhs.state;
         }
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+        auto operator()(const Node *lhs, const Node *rhs) const -> bool
+        {
             return lhs->state == rhs->state;
         }
     };
     struct CompareOrderedGreater {
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool {
+        auto operator()(const Node *lhs, const Node *rhs) const -> bool
+        {
             return lhs->cost > rhs->cost;
         }
     };
@@ -644,12 +679,14 @@ class RLTS {
 
 public:
     RLTS(const SearchInput<EnvT, ModelT, RerooterT> &input_)
-        : input(input_), status(Status::INIT), model(input.model), rerooter(input.rerooter) {
+        : input(input_), status(Status::INIT), model(input.model), rerooter(input.rerooter)
+    {
         reset();
     }
 
     // Initialize the search with root node inference output
-    void init() {
+    void init()
+    {
         if (status != Status::INIT) {
             spdlog::error("Coroutine needs to be reset() before calling init()");
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
@@ -666,7 +703,8 @@ public:
         status = Status::OK;
     }
 
-    void reset() {
+    void reset()
+    {
         status = Status::INIT;
         timeout = false;
         search_output = SearchOutput<EnvT, RerooterSearchOutputT>{.puzzle_name = input.puzzle_name};
@@ -680,7 +718,8 @@ public:
         rerooter.reset();
     }
 
-    void step() {
+    void step()
+    {
         if (open.empty()) {
             status = Status::ERROR;
             spdlog::error("Exhausted open list - name: {:s}, budget: {:d}.", input.puzzle_name, input.search_budget);
@@ -774,11 +813,13 @@ public:
         }
     }
 
-    [[nodiscard]] Status get_status() const {
+    [[nodiscard]] Status get_status() const
+    {
         return status;
     }
 
-    [[nodiscard]] auto get_search_output() -> SearchOutput<EnvT, RerooterSearchOutputT> {
+    [[nodiscard]] auto get_search_output() -> SearchOutput<EnvT, RerooterSearchOutputT>
+    {
         // If user provided rerooter search output then grab it
         if constexpr (detail::HasRerooterSearchOutput<RerooterT>) {
             search_output.rerooter_search_output = rerooter.get_search_output();
@@ -786,7 +827,8 @@ public:
         return search_output;
     }
 
-    void run() {
+    void run()
+    {
         TimerWall timer(-1);
         timer.start();
         init();
@@ -796,7 +838,8 @@ public:
     }
 
 private:
-    void batch_predict() {
+    void batch_predict()
+    {
         if (inference_nodes.empty()) {
             return;
         }
@@ -827,7 +870,8 @@ private:
         inference_nodes.clear();
     }
 
-    void create_solution_data(const NodeT &node) {
+    void create_solution_data(const NodeT &node)
+    {
         auto current = &node;
         double solution_cost = 0;
         search_output.solution_path_states.push_back(current->state);
@@ -848,7 +892,8 @@ private:
         std::ranges::reverse(search_output.solution_path_w_cumulative);
     }
 
-    void set_solution(const NodeT &node) {
+    void set_solution(const NodeT &node)
+    {
         status = Status::SOLVED;
         search_output.solution_found = true;
         search_output.solution_cost = node.g;
@@ -908,7 +953,8 @@ private:
 
 template <IsEnv EnvT, IsRLTSModel ModelT, typename RerooterT>
     requires IsRerooter<RerooterT, EnvT>
-auto search(const SearchInput<EnvT, ModelT, RerooterT> &input) {
+auto search(const SearchInput<EnvT, ModelT, RerooterT> &input)
+{
     TimerWall timer(-1);
     RLTS<EnvT, ModelT, RerooterT> step_rlts(input);
     timer.start();

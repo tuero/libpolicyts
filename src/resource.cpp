@@ -7,7 +7,8 @@
 
 namespace libpts {
 
-long get_mem_usage() {
+long get_mem_usage()
+{
     struct rusage usage{};
     [[maybe_unused]] int ret{};
     ret = getrusage(RUSAGE_SELF, &usage);

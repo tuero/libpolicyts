@@ -18,7 +18,8 @@
 
 namespace libpts::model {
 namespace {
-void check_config_key_exits(const nlohmann::json &model_config, const std::string &key) {
+void check_config_key_exits(const nlohmann::json &model_config, const std::string &key)
+{
     if (!model_config.contains(key)) {
         spdlog::error("model config json should contain an entry '{}'", key);
         std::exit(1);
@@ -26,7 +27,8 @@ void check_config_key_exits(const nlohmann::json &model_config, const std::strin
 }
 
 auto config_from_json(const nlohmann::json &model_config, const ObservationShape &obs_shape)
-    -> HeuristicConvNetWrapper::Config {
+    -> HeuristicConvNetWrapper::Config
+{
     // Check for valid json
     if (!model_config.contains("model_type")
         || model_config["model_type"].get<std::string>() != HeuristicConvNetWrapper::name)
@@ -76,7 +78,8 @@ HeuristicConvNetWrapper::HeuristicConvNetWrapper(
           model_->parameters(),
           torch::optim::AdamOptions(config.learning_rate).weight_decay(config.l2_weight_decay)
       ),
-      input_flat_size(config.observation_shape.flat_size()) {
+      input_flat_size(config.observation_shape.flat_size())
+{
     model_->to(torch_device_);
 };
 
@@ -102,11 +105,13 @@ HeuristicConvNetWrapper::HeuristicConvNetWrapper(
           model_->parameters(),
           torch::optim::AdamOptions(config.learning_rate).weight_decay(config.l2_weight_decay)
       ),
-      input_flat_size(config.observation_shape.flat_size()) {
+      input_flat_size(config.observation_shape.flat_size())
+{
     model_->to(torch_device_);
 };
 
-void HeuristicConvNetWrapper::print() const {
+void HeuristicConvNetWrapper::print() const
+{
     std::ostringstream oss;
     std::ostream &os = oss;
     os << *model_;
@@ -118,7 +123,8 @@ void HeuristicConvNetWrapper::print() const {
     spdlog::info("Number of parameters: {:d}", num_params);
 }
 
-auto HeuristicConvNetWrapper::save_checkpoint(long long int step) -> std::string {
+auto HeuristicConvNetWrapper::save_checkpoint(long long int step) -> std::string
+{
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
@@ -127,7 +133,8 @@ auto HeuristicConvNetWrapper::save_checkpoint(long long int step) -> std::string
     torch::save(model_optimizer_, absl::StrCat(full_path, "-optimizer.pt"));
     return full_path;
 }
-auto HeuristicConvNetWrapper::save_checkpoint_without_optimizer(long long int step) -> std::string {
+auto HeuristicConvNetWrapper::save_checkpoint_without_optimizer(long long int step) -> std::string
+{
     // create directory for model
     std::filesystem::create_directories(path_);
     std::string full_path = absl::StrCat(path_, checkpoint_base_name_, "checkpoint-", step);
@@ -136,7 +143,8 @@ auto HeuristicConvNetWrapper::save_checkpoint_without_optimizer(long long int st
     return full_path;
 }
 
-void HeuristicConvNetWrapper::load_checkpoint(const std::string &path) {
+void HeuristicConvNetWrapper::load_checkpoint(const std::string &path)
+{
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))
         || !std::filesystem::exists(absl::StrCat(path, "-optimizer.pt")))
     {
@@ -147,7 +155,8 @@ void HeuristicConvNetWrapper::load_checkpoint(const std::string &path) {
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
     torch::load(model_optimizer_, absl::StrCat(path, "-optimizer.pt"), torch_device_);
 }
-void HeuristicConvNetWrapper::load_checkpoint_without_optimizer(const std::string &path) {
+void HeuristicConvNetWrapper::load_checkpoint_without_optimizer(const std::string &path)
+{
     if (!std::filesystem::exists(absl::StrCat(path, ".pt"))) {
         const auto error_msg = std::format("path {:s} does not contain model", path);
         spdlog::error(error_msg);
@@ -156,7 +165,8 @@ void HeuristicConvNetWrapper::load_checkpoint_without_optimizer(const std::strin
     torch::load(model_, absl::StrCat(path, ".pt"), torch_device_);
 }
 
-auto HeuristicConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std::vector<InferenceOutput> {
+auto HeuristicConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std::vector<InferenceOutput>
+{
     const int batch_size = static_cast<int>(batch.size());
 
     // Check for bad input
@@ -202,7 +212,8 @@ auto HeuristicConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> s
     return inference_output;
 }
 
-auto HeuristicConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double {
+auto HeuristicConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
+{
     const int batch_size = static_cast<int>(batch.size());
 
     // Check for bad input

@@ -25,7 +25,8 @@ concept IsMultiTSModel = lubyts::detail::IsLubyModel<T>;
 // Depths follow fixed sequence
 struct MultiTSDepthModel {
     int depth;
-    auto operator()([[maybe_unused]] int iter, [[maybe_unused]] Observation &obs) -> int {
+    auto operator()([[maybe_unused]] int iter, [[maybe_unused]] Observation &obs) -> int
+    {
         return depth;
     }
 };
@@ -48,7 +49,8 @@ template <IsEnv EnvT>
 using SearchOutput = lubyts::detail::SearchOutput<EnvT>;
 
 template <IsEnv EnvT, IsMultiTSModel ModelT>
-auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
+auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT>
+{
     lubyts::detail::SearchInput<EnvT, ModelT> search_input{
         .puzzle_name = input.puzzle_name,
         .state = input.state,

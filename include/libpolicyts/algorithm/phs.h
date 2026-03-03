@@ -38,7 +38,8 @@ template <IsEnv EnvT, IsPHSModel ModelT>
 using PHS = phs::detail::PHS<EnvT, ModelT>;
 
 template <IsEnv EnvT, IsPHSModel ModelT>
-auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT> {
+auto search(const SearchInput<EnvT, ModelT> &input) -> SearchOutput<EnvT>
+{
     TimerWall timer(-1);
     PHS<EnvT, ModelT> step_phs(input);
     step_phs.init();

@@ -28,7 +28,8 @@ TwoHeadedConvNetImpl::TwoHeadedConvNetImpl(
       conv1x1_policy_(conv1x1(resnet_channels_, policy_channels_)),
       conv1x1_heuristic_(conv1x1(resnet_channels_, heuristic_channels_)),
       policy_mlp_(policy_mlp_input_size_, policy_mlp_layers, num_actions, "policy_head_"),
-      heuristic_mlp_(heuristic_mlp_input_size_, heuristic_mlp_layers, 1, "heuristic_head_") {
+      heuristic_mlp_(heuristic_mlp_input_size_, heuristic_mlp_layers, 1, "heuristic_head_")
+{
     // ResNet body
     for (int i = 0; i < resnet_blocks; ++i) {
         resnet_layers_->push_back(ResidualBlock(resnet_channels_, i, use_batchnorm));
@@ -41,7 +42,8 @@ TwoHeadedConvNetImpl::TwoHeadedConvNetImpl(
     register_module("heuristic_mlp", heuristic_mlp_);
 }
 
-auto TwoHeadedConvNetImpl::forward(torch::Tensor x) -> TwoHeadedConvNetOutput {
+auto TwoHeadedConvNetImpl::forward(torch::Tensor x) -> TwoHeadedConvNetOutput
+{
     torch::Tensor output = resnet_head_->forward(x);
     // ResNet body
     for (int i = 0; i < static_cast<int>(resnet_layers_->size()); ++i) {
