@@ -135,8 +135,8 @@ target_link_libraries(main PRIVATE libpolicyts::libpolicyts)
 > 
 > You can use the triplet in the vcpkg-registry which will include `LIBTORCH_ROOT` in the dependency ABI.
 >
-> If you see a CMake warning about an `RPATH` cycle involving `libtorch/libc10`
-> (often caused by vcpkg reusing an older cached build of a dependency),
+> If you still somehow see a CMake warning about an `RPATH` cycle involving `libtorch/libc10`
+> (often caused by vcpkg reusing an older cached build of a dependency and you aren't using the vcpkg registry triplet),
 > delete the build folder, and request to not reuse cached artifacts when configuring:
 > `VCPKG_BINARY_SOURCES=clear cmake --preset=debug-linux`
 
