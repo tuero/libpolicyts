@@ -128,6 +128,19 @@ target_link_libraries(main PRIVATE libpolicyts::libpolicyts)
 ```
 
 
+> [!IMPORTANT]
+> If you have pytorch installed in multiple virtual environments, you may get a configure error under the following scenario:
+> You configured this dependency through vcpkg with `LIBTORCH_ROOT` pointing to one virtual environment,
+> and then you trying to configure this dependency through vcpkg with `LIBTORCH_ROOT` pointing to another virtual environment.
+> 
+> The portfile should contain the `LIBTORCH_ROOT` path in the vcpkg port ABI to prevent this error.
+>
+> If you see a CMake warning about an `RPATH` cycle involving `libtorch/libc10`
+> (often caused by vcpkg reusing an older cached build of a dependency),
+> delete the build folder, and request to not reuse cached artifacts when configuring:
+> `VCPKG_BINARY_SOURCES=clear cmake --preset=debug-linux`
+
+
 ## Building Examples
 The `CMakePrests.json` defines build options for the examples and libtorch neural models.
 You will first need to set the following environment variables for your `CC`, `CC`, and `FC` compiler.
@@ -144,6 +157,10 @@ export LIBTORCH_ROOT=`python3 -c 'import torch;print(torch.utils.cmake_prefix_pa
 
 Using the supplied `CMakePresets.json`:
 ```shell
-cmake --preset=release
-cmake --build --preset=release -- -j8
+cmake --preset=release-linux
+cmake --build --preset=release-linux -- -j8
+# OSX may not have good support
+# cmake --preset=release-osx
+# cmake --build --preset=release-osx -- -j8
 ```
+

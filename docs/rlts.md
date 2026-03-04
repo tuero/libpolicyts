@@ -97,7 +97,7 @@ concept IsRerooter =
 Full example in `examples/rlts/`.
 
 ```cpp
-// Policy + Heuristic which satisfies the constraint for PHS
+// Policy + Heuristic which satisfies the constraint for RLTS
 template <int N>
 struct PolicyAndHeuristic {
     static_assert(N >= 1);
@@ -166,7 +166,7 @@ model_config["use_batchnorm"] = false;
 model_config["learning_rate"] = 3e-4;
 model_config["l2_weight_decay"] = 1e-4;
 
-// Policy+Heuristic which satisfies the constraint for PHS
+// Policy+Heuristic which satisfies the constraint for RLTS
 auto model = std::make_shared<PolicyAndHeuristic>(
     model_config,
     start_state.observation_shape(),
