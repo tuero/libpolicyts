@@ -33,6 +33,7 @@ struct PolicyAndHeuristic {
 namespace rlts = libpts::algorithm::rlts;
 using SokobanState = libpts::env::SokobanState;
 using NodeT = rlts::Node<SokobanState>;
+using NodeSet = rlts::NodeSet<SokobanState>;
 
 // Simple rerooter which produces 0 weights everywhere
 // The RLTS algorithm will ensure the root gets a weight of 1
@@ -40,14 +41,14 @@ struct SokobanRerooter {
     void reset() {}
     void init([[maybe_unused]] const NodeT &node) {}
     void expanded([[maybe_unused]] const NodeT &node) {}
-    void generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
-    void prev_generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
+    void generated([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeT &child_node) {}
+    void prev_generated([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeT &child_node) {}
     auto operator()([[maybe_unused]] const NodeT &node) -> double
     {
         return 0;
     }
     void batch_inferenced() {}
-    void solution_found([[maybe_unused]] const NodeT &node) {}
+    void solution_found([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeSet &tree_nodes) {}
 };
 
 using SokobanPolicy = PolicyAndHeuristic<SokobanState::num_actions>;

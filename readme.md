@@ -133,7 +133,7 @@ target_link_libraries(main PRIVATE libpolicyts::libpolicyts)
 > You configured this dependency through vcpkg with `LIBTORCH_ROOT` pointing to one virtual environment,
 > and then you trying to configure this dependency through vcpkg with `LIBTORCH_ROOT` pointing to another virtual environment.
 > 
-> You can use the triplet in the vcpkg-registry which will include `LIBTORCH_ROOT` in the dependency ABI.
+> You can use the triplet in the vcpkg-registry (or in `cmake/triplets`) which will include `LIBTORCH_ROOT` in the dependency ABI.
 >
 > If you still somehow see a CMake warning about an `RPATH` cycle involving `libtorch/libc10`
 > (often caused by vcpkg reusing an older cached build of a dependency and you aren't using the vcpkg registry triplet),

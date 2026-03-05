@@ -120,6 +120,43 @@ struct RerooterSearchOutputType<T, std::void_t<decltype(std::declval<const T &>(
 template <IsEnv EnvT>
 struct Node;
 
+struct NodeHasher {
+    using is_transparent = void;
+    template <IsEnv EnvT>
+    std::size_t operator()(const Node<EnvT> &node) const
+    {
+        return node.state.get_hash();
+    }
+    template <IsEnv EnvT>
+    auto operator()(const Node<EnvT> *node) const -> std::size_t
+    {
+        return node->state.get_hash();
+    }
+};
+struct NodeCompareEqual {
+    using is_transparent = void;
+    template <IsEnv EnvT>
+    bool operator()(const Node<EnvT> &lhs, const Node<EnvT> &rhs) const
+    {
+        return lhs.state == rhs.state;
+    }
+    template <IsEnv EnvT>
+    auto operator()(const Node<EnvT> *lhs, const Node<EnvT> *rhs) const -> bool
+    {
+        return lhs->state == rhs->state;
+    }
+};
+struct NodeCompareOrderedGreater {
+    template <IsEnv EnvT>
+    auto operator()(const Node<EnvT> *lhs, const Node<EnvT> *rhs) const -> bool
+    {
+        return lhs->cost > rhs->cost;
+    }
+};
+
+template <IsEnv EnvT>
+using NodeSet = absl::flat_hash_set<const Node<EnvT> *, NodeHasher, NodeCompareEqual>;
+
 // Concept which a rerooter must satisfy
 // This are the entry pointers which rerooters may want to use for internal state
 // If you want to support logging rerooter metrics, you must satisfy HasRerooterSearchOutput
@@ -127,16 +164,16 @@ struct Node;
 template <typename T, typename EnvT>
 concept IsRerooter =
     IsEnv<EnvT>
-    && requires(T t, const T ct, const Node<EnvT> &node, const Node<EnvT> &current_node, const Node<EnvT> &child_node) {
-           { t.reset() };                                     // Reset the rerooter state
-           { t.init(node) };                                  // Initialize rerooter with root node
-           { t.expanded(node) };                              // Node was just expanded
-           { t.generated(current_node, child_node) };         // child_node was just generated from current_node
-           { t.prev_generated(current_node, child_node) };    // child_node was previously generated and being pruned
-           { t(node) } -> std::same_as<double>;               // Get rerooting weight for this node
-           { t.batch_inferenced() };                          // Batch inference was just performed for policy
-           { t.solution_found(node) };                        // Solution found at the generated node
-       } && HasValidRerooterSearchOutput<T>;                  // Optional .get_search_output() support
+    && requires(T t, const Node<EnvT> &node, const Node<EnvT> &child_node, const NodeSet<EnvT> &tree_nodes) {
+           { t.reset() };                             // Reset the rerooter state
+           { t.init(node) };                          // Initialize rerooter with root node
+           { t.expanded(node) };                      // Node was just expanded
+           { t.generated(node, child_node) };         // child_node was just generated from current node
+           { t.prev_generated(node, child_node) };    // child_node was previously generated and being pruned
+           { t(node) } -> std::same_as<double>;       // Get rerooting weight for this node
+           { t.batch_inferenced() };                  // Batch inference was just performed for policy
+           { t.solution_found(node, tree_nodes) };    // Solution found at the node, with access to all tree nodes
+       } && HasValidRerooterSearchOutput<T>;          // Optional .get_search_output() support
 
 enum class CostMode {
     Slenderness,
@@ -610,35 +647,6 @@ struct Node {
         cost = std::ranges::min(costs);
     }
 
-    struct Hasher {
-        using is_transparent = void;
-        std::size_t operator()(const Node &node) const
-        {
-            return node.state.get_hash();
-        }
-        auto operator()(const Node *node) const -> std::size_t
-        {
-            return node->state.get_hash();
-        }
-    };
-    struct CompareEqual {
-        using is_transparent = void;
-        bool operator()(const Node &lhs, const Node &rhs) const
-        {
-            return lhs.state == rhs.state;
-        }
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool
-        {
-            return lhs->state == rhs->state;
-        }
-    };
-    struct CompareOrderedGreater {
-        auto operator()(const Node *lhs, const Node *rhs) const -> bool
-        {
-            return lhs->cost > rhs->cost;
-        }
-    };
-
     // NOLINTBEGIN (misc-non-private-member-variables-in-classes)
     EnvT state;
     double log_p = 0;
@@ -674,7 +682,6 @@ class RLTS {
     using InputT = ModelT::InferenceInput;
     using OutputT = ModelT::InferenceOutput;
     using OpenListT = std::vector<const NodeT *>;
-    using ClosedListT = absl::flat_hash_set<const NodeT *, typename NodeT::Hasher, typename NodeT::CompareEqual>;
     using RerooterSearchOutputT = typename RerooterSearchOutputType<RerooterT>::type;
 
 public:
@@ -728,7 +735,7 @@ public:
 
         // Remove top node from open and put into closed
         ++search_output.num_expanded;
-        std::ranges::pop_heap(open, typename NodeT::CompareOrderedGreater{});
+        std::ranges::pop_heap(open, NodeCompareOrderedGreater{});
         const NodeT *current = open.back();
         open.pop_back();
         closed.insert(current);
@@ -800,7 +807,7 @@ public:
                 );
                 set_solution(*child_node);
                 status = Status::SOLVED;
-                rerooter.solution_found(*child_node);
+                rerooter.solution_found(*child_node, generated_nodes);
                 return;
             }
 
@@ -866,7 +873,7 @@ private:
         rerooter.batch_inferenced();
 
         // Heapify open
-        std::ranges::make_heap(open, typename NodeT::CompareOrderedGreater{});
+        std::ranges::make_heap(open, NodeCompareOrderedGreater{});
         inference_nodes.clear();
     }
 
@@ -945,8 +952,8 @@ private:
     SearchOutput<EnvT, RerooterSearchOutputT> search_output;    // Search output containing trajectory + stats
     std::vector<NodeT *> inference_nodes;                       // Nodes in queue for batch inference
     OpenListT open;                                             // Open list
-    ClosedListT closed;                                         // Closed list
-    ClosedListT generated_nodes;                                // open + closed (used for duplication checks)
+    NodeSet<EnvT> closed;                                       // Closed list
+    NodeSet<EnvT> generated_nodes;                              // open + closed (used for duplication checks)
     double cumulative_expansion_weights = 0;                    // W_<t tracker
     StablePool<NodeT> node_pool;                                // Stable storage + pointers for nodes
 };
