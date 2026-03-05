@@ -110,6 +110,16 @@ public:
      */
     auto learn(std::vector<LearningInput> &batch) -> double;
 
+    /**
+     * Get the model named parameters
+     */
+    auto get_named_parameters(bool recurse = true) -> ModelTorchOrdredDictMap override;
+
+    /**
+     * Get the model named buffers
+     */
+    auto get_named_buffers(bool recurse = true) -> ModelTorchOrdredDictMap override;
+
 protected:
     Config config;
     network::TwoHeadedConvNet model_;

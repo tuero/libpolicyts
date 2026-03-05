@@ -267,4 +267,14 @@ auto HeuristicConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     return loss_value;
 }
 
+auto HeuristicConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrdredDictMap
+{
+    return {{"heuristic_convnet", model_->named_parameters(recurse)}};
+}
+
+auto HeuristicConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrdredDictMap
+{
+    return {{"heuristic_convnet", model_->named_buffers(recurse)}};
+}
+
 }    // namespace libpts::model
