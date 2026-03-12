@@ -4,6 +4,8 @@
 #ifndef LIBPTS_TREE_LAYOUT_H_
 #define LIBPTS_TREE_LAYOUT_H_
 
+#include <libpolicyts/tree_viz.h>
+
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -22,26 +24,6 @@ struct LayoutInputNode {
 struct LayoutPoint {
     float x = 0.0f;
     float y = 0.0f;
-};
-
-constexpr float DEFAULT_LEVEL_GAP = 120.0f;
-constexpr float DEFAULT_SIBLING_GAP = 120.0f;
-constexpr float DEFAULT_MARGIN_X = 100.0f;
-constexpr float DEFAULT_MARGIN_Y = 60.0f;
-
-struct TreeLayoutConfig {
-    // Vertical distance between levels in the tree
-    float level_gap = DEFAULT_LEVEL_GAP;
-
-    // Horizontal distance between adjacent leaf "slots".
-    float sibling_gap = DEFAULT_SIBLING_GAP;
-
-    // Margins for the overall tree drawing.
-    float margin_x = DEFAULT_MARGIN_X;
-    float margin_y = DEFAULT_MARGIN_Y;
-
-    // Extra leaf slots inserted between disconnected roots in a forest.
-    float forest_gap_leaf_slots = 1.0f;
 };
 
 // Cache keyed by tree structure

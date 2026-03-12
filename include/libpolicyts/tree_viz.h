@@ -16,17 +16,36 @@
 
 namespace libpts::treeviz {
 
+// Default viewer config
 constexpr int DEFAULT_WIDTH = 1600;
 constexpr int DEFAULT_HEIGHT = 900;
 constexpr float DEFAULT_WINDOW_SPLIT = 0.3f;    // Percentage of window to right side panel
-
-// Default viewer config
 struct ViewerConfig {
     int width = DEFAULT_WIDTH;
     int height = DEFAULT_HEIGHT;
     bool dark_mode = true;
     float window_split_percentage = DEFAULT_WINDOW_SPLIT;
     std::string title = "Tree Viewer";
+};
+
+// Default layout config
+constexpr float DEFAULT_LEVEL_GAP = 120.0f;
+constexpr float DEFAULT_SIBLING_GAP = 120.0f;
+constexpr float DEFAULT_MARGIN_X = 100.0f;
+constexpr float DEFAULT_MARGIN_Y = 60.0f;
+struct TreeLayoutConfig {
+    // Vertical distance between levels in the tree
+    float level_gap = DEFAULT_LEVEL_GAP;
+
+    // Horizontal distance between adjacent leaf "slots"
+    float sibling_gap = DEFAULT_SIBLING_GAP;
+
+    // Margins for the overall tree drawing.
+    float margin_x = DEFAULT_MARGIN_X;
+    float margin_y = DEFAULT_MARGIN_Y;
+
+    // Extra leaf slots inserted between disconnected roots in a forest
+    float forest_gap_leaf_slots = 1.0f;
 };
 
 // User code add fields to the detail UI sidebar for any arbitrary type convertable to str
@@ -100,7 +119,7 @@ struct PreparedTree {
 // A tree viewer GUI
 class TreeViewer {
 public:
-    explicit TreeViewer(const ViewerConfig &config = {});
+    explicit TreeViewer(const ViewerConfig &viewer_config = {}, const TreeLayoutConfig &tree_config = {});
     ~TreeViewer();
 
     // Remove copy/move

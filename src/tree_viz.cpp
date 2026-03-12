@@ -96,7 +96,7 @@ auto IsSpaceDown(GLFWwindow *window) -> bool
     return IsKeyDown(window, GLFW_KEY_SPACE);
 }
 
-auto IsCommandDown(GLFWwindow *window) -> bool
+[[maybe_unused]] auto IsCommandDown(GLFWwindow *window) -> bool
 {
     return IsKeyDown(window, GLFW_KEY_LEFT_SUPER) || IsKeyDown(window, GLFW_KEY_RIGHT_SUPER);
 }
@@ -137,8 +137,8 @@ void DetailUI::separator()
 
 // Setup and teardown for ImGUI
 struct TreeViewer::Impl {
-    Impl(const ViewerConfig cfg)
-        : config(std::move(cfg))
+    Impl(const ViewerConfig viewer_cfg, const TreeLayoutConfig &tree_cfg)
+        : viewer_config(std::move(viewer_cfg)), tree_config(std::move(tree_cfg))
     {
         glfwSetErrorCallback(glfw_error_callback);
         if (!glfwInit()) {
@@ -163,7 +163,7 @@ struct TreeViewer::Impl {
 #endif
 
         // Create window with graphics context
-        window = glfwCreateWindow(config.width, config.height, "Tree Visualizer", nullptr, nullptr);
+        window = glfwCreateWindow(viewer_config.width, viewer_config.height, "Tree Visualizer", nullptr, nullptr);
         if (!window) {
             glfwTerminate();
             constexpr auto error_msg = "Failed to create GLFW window";
@@ -181,7 +181,7 @@ struct TreeViewer::Impl {
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
         // Setup Dear ImGui style
-        if (config.dark_mode) {
+        if (viewer_config.dark_mode) {
             ImGui::StyleColorsDark();
         } else {
             ImGui::StyleColorsLight();
@@ -304,7 +304,7 @@ struct TreeViewer::Impl {
         }
 
         // Compute or reuse cached layout positions
-        detail::compute_tree_layout(layout_nodes, layout_cache, layout_config);
+        detail::compute_tree_layout(layout_nodes, layout_cache, tree_config);
 
         // Apply cached positions back onto the visual nodes
         for (auto &node : visual_tree.nodes) {
@@ -348,7 +348,7 @@ struct TreeViewer::Impl {
             ImGui::DockBuilderSplitNode(
                 dockspace_id,
                 ImGuiDir_Right,
-                config.window_split_percentage,
+                viewer_config.window_split_percentage,
                 &dock_id_details,
                 &dock_id_tree
             );
@@ -547,7 +547,8 @@ struct TreeViewer::Impl {
         ImGui::End();
     }
 
-    ViewerConfig config;
+    ViewerConfig viewer_config;
+    TreeLayoutConfig tree_config;
 
     // Platform / graphics state
     GLFWwindow *window = nullptr;
@@ -560,15 +561,14 @@ struct TreeViewer::Impl {
 
     // Current tree to draw
     VisualTreeCache visual_tree_cache;
-    detail::TreeLayoutConfig layout_config;
     detail::TreeLayoutCache layout_cache;
 
     int step_amount = 0;
     bool is_reset_clicked = false;
 };
 
-TreeViewer::TreeViewer(const ViewerConfig &config)
-    : impl_(std::make_unique<Impl>(config))
+TreeViewer::TreeViewer(const ViewerConfig &viewer_config, const TreeLayoutConfig &tree_config)
+    : impl_(std::make_unique<Impl>(viewer_config, tree_config))
 {}
 TreeViewer::~TreeViewer() = default;
 
