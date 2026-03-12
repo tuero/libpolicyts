@@ -42,3 +42,6 @@ compile_commands.json
 # Experiments/Misc to ignore
 experiments/
 notebooks/
+
+# ImGUI
+imgui.ini
