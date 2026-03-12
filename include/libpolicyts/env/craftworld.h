@@ -89,6 +89,18 @@ public:
         return ObservationShape::from_array(state.observation_shape());
     }
 
+    // Get observation, which should be viewed as [H,W, C] = image_shape()
+    [[nodiscard]] auto to_image() const noexcept -> std::vector<uint8_t>
+    {
+        return state.to_image();
+    }
+
+    // Get observation, which should be viewed as [H,W, C] = image_shape()
+    [[nodiscard]] auto image_shape() const noexcept -> std::array<int, 3>
+    {
+        return state.image_shape();
+    }
+
     // Return true if state is a solutions state
     [[nodiscard]] auto is_solution() const noexcept -> bool
     {

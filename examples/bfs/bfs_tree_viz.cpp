@@ -1,5 +1,7 @@
 #include <libpolicyts/libpolicyts.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <print>
 #include <ranges>
 #include <vector>
@@ -50,6 +52,18 @@ struct SearchNodeAdapter {
     [[nodiscard]] auto label(const Node &n) const -> std::string
     {
         return std::format("{}", n->id);
+    }
+
+    [[nodiscard]] auto image_shape(const Node &n) const -> std::pair<int, int>
+    {
+        const auto shape = n->state.image_shape();
+        return {shape[0], shape[1]};
+    }
+
+    [[nodiscard]] auto get_image(const Node &n) const -> std::vector<std::uint8_t>
+    {
+        // return {};
+        return n->state.to_image();
     }
 };
 

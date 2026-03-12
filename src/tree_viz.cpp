@@ -14,6 +14,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cmath>
 #include <print>
 
@@ -70,6 +71,12 @@ struct VisualTreeCache {
         valid = false;
         tree = {};
     }
+};
+
+struct ImageTexture {
+    GLuint id = 0;
+    int width = 0;
+    int height = 0;
 };
 
 auto compute_prepared_tree_fingerprint(const PreparedTree &prepared) -> uint64_t
@@ -200,6 +207,9 @@ struct TreeViewer::Impl {
 
     ~Impl()
     {
+        if (image_texture.id != 0) {
+            glDeleteTextures(1, &image_texture.id);
+        }
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
@@ -396,6 +406,7 @@ struct TreeViewer::Impl {
             is_reset_clicked = true;
             visual_tree_cache.clear();
             selected_id.reset();
+            clear_cached_image();
             pan = {0.0f, 0.0f};
             zoom = 1.0f;
         }
@@ -519,7 +530,7 @@ struct TreeViewer::Impl {
         // NOLINTEND(*-magic-numbers)
     }
 
-    void draw_detail_panel(const DetailCallback &detail_callback)
+    void draw_detail_panel(const DetailCallback &detail_callback, const ImageCallback &image_callback)
     {
         ImGui::Begin("Node Info");
 
@@ -534,6 +545,7 @@ struct TreeViewer::Impl {
         VisualTree &visual_tree = visual_tree_cache.tree;
         if (!visual_tree.index_by_id.contains(*selected_id)) {
             ImGui::Text("Selected node no longer exists.");    // NOLINT(*-type-vararg)
+            clear_cached_image();
             ImGui::End();
             return;
         }
@@ -541,10 +553,88 @@ struct TreeViewer::Impl {
         const auto selected_idx = visual_tree.index_by_id.at(*selected_id);
         const VisualNode &node = visual_tree.nodes[selected_idx];
 
+        // Selection changed, so get image and cache
+        if (!cached_image_source_index || *cached_image_source_index != node.source_index) {
+            cached_image = image_callback(node.source_index);
+            cached_image_source_index = node.source_index;
+        }
+
+        // Draw the cached image
+        const auto [img_height, img_width] = cached_image.shape;
+        if (img_width > 0 && img_height > 0 && !cached_image.data.empty()) {
+            const std::size_t expected_size =
+                static_cast<std::size_t>(img_width) * static_cast<std::size_t>(img_height) * 3;
+            ImGui::Separator();
+            ImGui::Text("Observation");    // NOLINT(*-type-vararg)
+            if (cached_image.data.size() != expected_size) {
+                ImGui::Text("Observation data size mismatch.");    // NOLINT(*-type-vararg)
+            } else {
+                // Rescale to fit
+                ImVec2 avail = ImGui::GetContentRegionAvail();
+                if (avail.x > 0.0f && avail.y > 0.0f) {
+                    const float scale =
+                        std::min(avail.x / static_cast<float>(img_width), avail.y / static_cast<float>(img_height));
+                    if (scale > 0.0f) {
+                        const ImVec2 image_size{
+                            static_cast<float>(img_width) * scale,
+                            static_cast<float>(img_height) * scale
+                        };
+                        upload_image_texture(cached_image.data, img_width, img_height);
+                        ImGui::Image(
+                            static_cast<ImTextureID>(static_cast<std::uintptr_t>(image_texture.id)),
+                            image_size
+                        );
+                    }
+                }
+            }
+        }
+
+        // Draw node details
         DetailUI ui;
         detail_callback(node.source_index, ui);
 
         ImGui::End();
+    }
+
+    void ensure_image_texture()
+    {
+        if (image_texture.id != 0) {
+            return;
+        }
+
+        glGenTextures(1, &image_texture.id);
+        glBindTexture(GL_TEXTURE_2D, image_texture.id);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    }
+
+    void upload_image_texture(const std::vector<std::uint8_t> &pixels, int width, int height)
+    {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+
+        ensure_image_texture();
+        glBindTexture(GL_TEXTURE_2D, image_texture.id);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+        if (image_texture.width != width || image_texture.height != height) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+            image_texture.width = width;
+            image_texture.height = height;
+        } else {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+        }
+    }
+
+    void clear_cached_image()
+    {
+        cached_image = {};
+        cached_image_source_index.reset();
+        image_texture.width = 0;
+        image_texture.height = 0;
     }
 
     ViewerConfig viewer_config;
@@ -563,6 +653,10 @@ struct TreeViewer::Impl {
     VisualTreeCache visual_tree_cache;
     detail::TreeLayoutCache layout_cache;
 
+    ImageTexture image_texture;
+    ImageData cached_image;
+    std::optional<std::size_t> cached_image_source_index;
+
     int step_amount = 0;
     bool is_reset_clicked = false;
 };
@@ -572,14 +666,18 @@ TreeViewer::TreeViewer(const ViewerConfig &viewer_config, const TreeLayoutConfig
 {}
 TreeViewer::~TreeViewer() = default;
 
-void TreeViewer::render_prepared(const PreparedTree &tree, const DetailCallback &detail_callback)
+void TreeViewer::render_prepared(
+    const PreparedTree &tree,
+    const DetailCallback &detail_callback,
+    const ImageCallback &image_cb
+)
 {
     impl_->build_visual_tree(tree);
     impl_->begin_frame();
 
     impl_->SetupDockspaceLayout();
     impl_->draw_tree_panel();
-    impl_->draw_detail_panel(detail_callback);
+    impl_->draw_detail_panel(detail_callback, image_cb);
 
     impl_->end_frame();
 }

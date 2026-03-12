@@ -6,12 +6,14 @@
 
 #include <cassert>
 #include <concepts>
+#include <cstdint>
 #include <format>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <ranges>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace libpts::treeviz {
@@ -101,6 +103,9 @@ concept TreeNodeAdapter = requires(const Adapter &a, const Node &n) {
     { a.parent_id(n) } -> std::same_as<std::optional<int>>;
     { a.action_taken(n) } -> std::same_as<int>;
     { a.label(n) } -> std::convertible_to<std::string>;
+    // If no image support, return an empty pixel array
+    { a.image_shape(n) } -> std::same_as<std::pair<int, int>>;        // (H,W) in pixel count
+    { a.get_image(n) } -> std::same_as<std::vector<std::uint8_t>>;    // Flat RBG pixel vector (H*W*3)
 };
 
 struct PreparedNode {
@@ -196,11 +201,19 @@ public:
         // Thin templated bridge:
         // convert arbitrary nodes -> PreparedTree,
         // then call the non-templated implementation
+
+        // Internal usage to get the detailed node data from nodes
         DetailCallback cb = [&, f = std::move(detail_fn)](std::size_t source_index, DetailUI &ui) {
             f(nodes.at(source_index), ui);
         };
 
-        render_prepared(prepared, cb);
+        // Internal usage to get image data from nodes
+        ImageCallback image_cb = [&](std::size_t source_index) -> ImageData {
+            const auto &node = nodes.at(source_index);
+            return {.shape = adapter.image_shape(node), .data = adapter.get_image(node)};
+        };
+
+        render_prepared(prepared, cb, image_cb);
     }
 
 private:
@@ -208,8 +221,17 @@ private:
     std::unique_ptr<Impl> impl_;
 
     using DetailCallback = std::function<void(std::size_t, DetailUI &)>;
+    struct ImageData {
+        std::pair<int, int> shape;         // (H,W) in pixel count
+        std::vector<std::uint8_t> data;    // Flat RGB pixel vector (H*W*3)
+    };
+    using ImageCallback = std::function<ImageData(std::size_t)>;
 
-    void render_prepared(const PreparedTree &tree, const DetailCallback &detail_callback);
+    void render_prepared(
+        const PreparedTree &tree,
+        const DetailCallback &detail_callback,
+        const ImageCallback &image_cb
+    );
 };
 
 }    // namespace libpts::treeviz
