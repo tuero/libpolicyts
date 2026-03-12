@@ -1,5 +1,11 @@
 // File: tree_viz.cpp
 // Description: Tree visualizer
+//
+// NOTE(macOS): OpenGL core-profile entry points are not reliably available via direct
+// gl* symbol calls in this translation unit on Apple drivers. That can yield null
+// glGetString results and glGenTextures returning 0 even with a valid GLFW context.
+// We fix this by loading GL function pointers via glfwGetProcAddress and using those
+// for texture-related calls, matching what the ImGui OpenGL backend does.
 
 #include <libpolicyts/tree_viz.h>
 
@@ -7,6 +13,16 @@
 #include "tree_layout.h"
 
 #define GL_SILENCE_DEPRECATION
+#define GLFW_INCLUDE_NONE
+#if defined(__APPLE__)
+#if __has_include(<OpenGL/gl3.h>)
+#include <OpenGL/gl3.h>
+#elif __has_include(<OpenGL/gl.h>)
+#include <OpenGL/gl.h>
+#endif
+#else
+#include <GL/gl.h>
+#endif
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -21,8 +37,8 @@
 #include <unordered_set>
 
 namespace libpts::treeviz {
-
 namespace {
+
 void glfw_error_callback(int error, const char *description)
 {
     std::print("GLFW Error {:d}: {:s}\n", error, description);
@@ -141,6 +157,24 @@ auto WantPanDrag(GLFWwindow *window) -> bool
     return false;
 }
 
+auto ToImTextureId(GLuint texture_id) -> ImTextureID
+{
+    return static_cast<ImTextureID>(static_cast<std::uintptr_t>(texture_id));
+}
+
+using GlGenTexturesFn = void (*)(GLsizei, GLuint *);
+using GlDeleteTexturesFn = void (*)(GLsizei, const GLuint *);
+using GlBindTextureFn = void (*)(GLenum, GLuint);
+using GlTexParameteriFn = void (*)(GLenum, GLenum, GLint);
+using GlTexImage2DFn = void (*)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void *);
+using GlTexSubImage2DFn = void (*)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum, const void *);
+using GlPixelStoreiFn = void (*)(GLenum, GLint);
+using GlActiveTextureFn = void (*)(GLenum);
+using GlGetErrorFn = GLenum (*)();
+using GlGetStringFn = const GLubyte *(*)(GLenum);
+using GlGetTexLevelParameterivFn = void (*)(GLenum, GLint, GLenum, GLint *);
+using GlIsTextureFn = GLboolean (*)(GLuint);
+
 }    // namespace
 
 void DetailUI::text(const std::string &s)
@@ -208,6 +242,25 @@ struct TreeViewer::Impl {
         // Setup Platform/Renderer backends
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init(glsl_version);
+
+        load_gl_functions();
+        if (!logged_gl_startup && gl_get_string_) {
+            logged_gl_startup = true;
+            // NOLINTBEGIN(*-reinterpret-cast)
+            const auto *version = reinterpret_cast<const char *>(gl_get_string_(GL_VERSION));
+            const auto *renderer = reinterpret_cast<const char *>(gl_get_string_(GL_RENDERER));
+            const auto *vendor = reinterpret_cast<const char *>(gl_get_string_(GL_VENDOR));
+            // NOLINTEND(*-reinterpret-cast)
+            spdlog::info(
+                "GL startup: version={}, renderer={}, vendor={}, font_tex={}",
+                version ? version : "null",
+                renderer ? renderer : "null",
+                vendor ? vendor : "null",
+                static_cast<std::uintptr_t>(ImGui::GetIO().Fonts->TexID)
+            );
+        }
+
+        ensure_image_texture();
     }
 
     // No copying
@@ -233,6 +286,32 @@ struct TreeViewer::Impl {
 
     void begin_frame()
     {
+        glfwMakeContextCurrent(window);
+        if (!logged_gl_probe) {
+            logged_gl_probe = true;
+            GLuint probe_id = 0;
+            if (gl_gen_textures_) {
+                gl_gen_textures_(1, &probe_id);
+            }
+            // NOLINTBEGIN(*-reinterpret-cast)
+            const auto err = gl_get_error_ ? gl_get_error_() : 0;
+            const auto *version = gl_get_string_ ? reinterpret_cast<const char *>(gl_get_string_(GL_VERSION)) : nullptr;
+            const auto *renderer =
+                gl_get_string_ ? reinterpret_cast<const char *>(gl_get_string_(GL_RENDERER)) : nullptr;
+            const auto *vendor = gl_get_string_ ? reinterpret_cast<const char *>(gl_get_string_(GL_VENDOR)) : nullptr;
+            // NOLINTEND(*-reinterpret-cast)
+            spdlog::info(
+                "GL probe: id={}, err=0x{:x}, version={}, renderer={}, vendor={}",
+                probe_id,
+                err,
+                version ? version : "null",
+                renderer ? renderer : "null",
+                vendor ? vendor : "null"
+            );
+            if (probe_id != 0 && gl_delete_textures_) {
+                gl_delete_textures_(1, &probe_id);
+            }
+        }
         glfwPollEvents();
 
         // Start the Dear ImGui frame
@@ -253,6 +332,11 @@ struct TreeViewer::Impl {
         glClearColor(CLEAR_COLOR.r, CLEAR_COLOR.g, CLEAR_COLOR.b, CLEAR_COLOR.a);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        if (!logged_font_tex) {
+            logged_font_tex = true;
+            spdlog::info("ImGui font texture id={}", static_cast<std::uintptr_t>(ImGui::GetIO().Fonts->TexID));
+        }
 
         // Swap buffers
         glfwSwapBuffers(window);
@@ -623,10 +707,7 @@ struct TreeViewer::Impl {
                             static_cast<float>(img_height) * scale
                         };
                         upload_image_texture(cached_image.data, img_width, img_height);
-                        ImGui::Image(
-                            static_cast<ImTextureID>(static_cast<std::uintptr_t>(image_texture.id)),
-                            image_size
-                        );
+                        ImGui::Image(ToImTextureId(image_texture.id), image_size);
                     }
                 }
             }
@@ -645,12 +726,26 @@ struct TreeViewer::Impl {
             return;
         }
 
-        glGenTextures(1, &image_texture.id);
-        glBindTexture(GL_TEXTURE_2D, image_texture.id);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        load_gl_functions();
+        glfwMakeContextCurrent(window);
+        if (gl_gen_textures_) {
+            gl_gen_textures_(1, &image_texture.id);
+        }
+        if (image_texture.id == 0 && !logged_texture_create_error) {
+            logged_texture_create_error = true;
+            spdlog::warn("glGenTextures returned 0; image textures will be unavailable.");
+        }
+        if (gl_bind_texture_) {
+            gl_bind_texture_(GL_TEXTURE_2D, image_texture.id);
+        }
+        if (gl_tex_parameteri_) {
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+            gl_tex_parameteri_(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+        }
     }
 
     void upload_image_texture(const std::vector<std::uint8_t> &pixels, int width, int height)
@@ -660,16 +755,117 @@ struct TreeViewer::Impl {
         }
 
         ensure_image_texture();
-        glBindTexture(GL_TEXTURE_2D, image_texture.id);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        if (gl_active_texture_) {
+            gl_active_texture_(GL_TEXTURE0);
+        }
+        if (gl_bind_texture_) {
+            gl_bind_texture_(GL_TEXTURE_2D, image_texture.id);
+        }
+        if (gl_pixel_storei_) {
+            gl_pixel_storei_(GL_UNPACK_ALIGNMENT, 1);
+            gl_pixel_storei_(GL_UNPACK_ROW_LENGTH, 0);
+            gl_pixel_storei_(GL_UNPACK_SKIP_PIXELS, 0);
+            gl_pixel_storei_(GL_UNPACK_SKIP_ROWS, 0);
+        }
+
+        const std::size_t pixel_count = static_cast<std::size_t>(width) * static_cast<std::size_t>(height);
+        image_rgba_scratch.resize(pixel_count * 4);
+        for (std::size_t i = 0; i < pixel_count; ++i) {
+            const std::size_t src = i * 3;
+            const std::size_t dst = i * 4;
+            image_rgba_scratch[dst] = pixels[src];
+            image_rgba_scratch[dst + 1] = pixels[src + 1];
+            image_rgba_scratch[dst + 2] = pixels[src + 2];
+            image_rgba_scratch[dst + 3] = 255;    // NOLINT(*-magic-numbers)
+        }
 
         if (image_texture.width != width || image_texture.height != height) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+            if (gl_get_error_) {
+                gl_get_error_();
+            }
+            if (gl_tex_image_2d_) {
+                gl_tex_image_2d_(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA8,
+                    width,
+                    height,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    image_rgba_scratch.data()
+                );
+            }
+            const GLenum err = gl_get_error_ ? gl_get_error_() : 0;
+            if (err != GL_NO_ERROR) {
+                spdlog::warn("GL_RGBA8 texture upload failed ({}); retrying with GL_RGBA", err);
+                if (gl_tex_image_2d_) {
+                    gl_tex_image_2d_(
+                        GL_TEXTURE_2D,
+                        0,
+                        GL_RGBA,
+                        width,
+                        height,
+                        0,
+                        GL_RGBA,
+                        GL_UNSIGNED_BYTE,
+                        image_rgba_scratch.data()
+                    );
+                }
+            }
             image_texture.width = width;
             image_texture.height = height;
         } else {
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+            if (gl_tex_sub_image_2d_) {
+                gl_tex_sub_image_2d_(
+                    GL_TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    width,
+                    height,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    image_rgba_scratch.data()
+                );
+            }
         }
+    }
+
+    void load_gl_functions()
+    {
+        if (gl_functions_loaded_) {
+            return;
+        }
+
+        // Use GLFW loader to avoid macOS core-profile symbol issues.
+        // NOLINTBEGIN(*-reinterpret-cast)
+        gl_gen_textures_ = reinterpret_cast<GlGenTexturesFn>(glfwGetProcAddress("glGenTextures"));
+        gl_delete_textures_ = reinterpret_cast<GlDeleteTexturesFn>(glfwGetProcAddress("glDeleteTextures"));
+        gl_bind_texture_ = reinterpret_cast<GlBindTextureFn>(glfwGetProcAddress("glBindTexture"));
+        gl_tex_parameteri_ = reinterpret_cast<GlTexParameteriFn>(glfwGetProcAddress("glTexParameteri"));
+        gl_tex_image_2d_ = reinterpret_cast<GlTexImage2DFn>(glfwGetProcAddress("glTexImage2D"));
+        gl_tex_sub_image_2d_ = reinterpret_cast<GlTexSubImage2DFn>(glfwGetProcAddress("glTexSubImage2D"));
+        gl_pixel_storei_ = reinterpret_cast<GlPixelStoreiFn>(glfwGetProcAddress("glPixelStorei"));
+        gl_active_texture_ = reinterpret_cast<GlActiveTextureFn>(glfwGetProcAddress("glActiveTexture"));
+        gl_get_error_ = reinterpret_cast<GlGetErrorFn>(glfwGetProcAddress("glGetError"));
+        gl_get_string_ = reinterpret_cast<GlGetStringFn>(glfwGetProcAddress("glGetString"));
+        gl_get_tex_level_parameteriv_ =
+            reinterpret_cast<GlGetTexLevelParameterivFn>(glfwGetProcAddress("glGetTexLevelParameteriv"));
+        gl_is_texture_ = reinterpret_cast<GlIsTextureFn>(glfwGetProcAddress("glIsTexture"));
+
+        gl_functions_loaded_ = true;
+        if (!gl_gen_textures_ || !gl_bind_texture_ || !gl_tex_image_2d_ || !gl_tex_sub_image_2d_) {
+            spdlog::warn(
+                "OpenGL function loading incomplete (glGenTextures={}, glBindTexture={}, glTexImage2D={}, "
+                "glTexSubImage2D={})",
+                reinterpret_cast<void *>(gl_gen_textures_),
+                reinterpret_cast<void *>(gl_bind_texture_),
+                reinterpret_cast<void *>(gl_tex_image_2d_),
+                reinterpret_cast<void *>(gl_tex_sub_image_2d_)
+            );
+        }
+        // NOLINTEND(*-reinterpret-cast)
     }
 
     void clear_cached_image()
@@ -851,14 +1047,36 @@ struct TreeViewer::Impl {
     float zoom = 1.0f;
     std::optional<int> selected_id;
 
-    // Current tree to draw
+    // Current tree to draw and cached values
     VisualTreeCache visual_tree_cache;
     detail::TreeLayoutCache layout_cache;
-
     ImageTexture image_texture;
     ImageData cached_image;
     std::optional<std::size_t> cached_image_source_index;
+    // Path reconstruction for GIFs
     std::unordered_set<int> solution_path_ids;
+    std::vector<std::uint8_t> image_rgba_scratch;
+
+    // GL debugging
+    bool logged_texture_create_error = false;
+    bool logged_gl_probe = false;
+    bool logged_font_tex = false;
+    bool logged_gl_startup = false;
+    bool gl_functions_loaded_ = false;
+
+    // MacOS needs to get the function pointers which ImGUI oses
+    GlGenTexturesFn gl_gen_textures_ = nullptr;
+    GlDeleteTexturesFn gl_delete_textures_ = nullptr;
+    GlBindTextureFn gl_bind_texture_ = nullptr;
+    GlTexParameteriFn gl_tex_parameteri_ = nullptr;
+    GlTexImage2DFn gl_tex_image_2d_ = nullptr;
+    GlTexSubImage2DFn gl_tex_sub_image_2d_ = nullptr;
+    GlPixelStoreiFn gl_pixel_storei_ = nullptr;
+    GlActiveTextureFn gl_active_texture_ = nullptr;
+    GlGetErrorFn gl_get_error_ = nullptr;
+    GlGetStringFn gl_get_string_ = nullptr;
+    GlGetTexLevelParameterivFn gl_get_tex_level_parameteriv_ = nullptr;
+    GlIsTextureFn gl_is_texture_ = nullptr;
 
     int gif_start_id = 0;
     int gif_end_id = 0;
