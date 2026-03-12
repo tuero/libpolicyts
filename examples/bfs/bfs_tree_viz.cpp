@@ -48,6 +48,10 @@ struct SearchNodeAdapter {
     {
         return n->action;
     }
+    [[nodiscard]] auto is_solution(const Node &n) const -> bool
+    {
+        return n->is_solution;
+    }
 
     [[nodiscard]] auto label(const Node &n) const -> std::string
     {

@@ -101,6 +101,7 @@ struct Node {
         auto c = state.apply_action(a);
         g = parent->g + c;
         action = a;
+        is_solution = state.is_solution();
     }
 
     struct Hasher {
@@ -155,6 +156,7 @@ struct Node {
     int id = -1;
     int parent_id = -1;
     mutable int expansion_number = -1;
+    bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 

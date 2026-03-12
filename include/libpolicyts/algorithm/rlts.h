@@ -618,6 +618,7 @@ struct Node {
         path_parents.push_back(parent);
         g = parent->g + c;
         action = a;
+        is_solution = state.is_solution();
     }
 
     void set_cost(CostMode cost_mode)
@@ -670,6 +671,7 @@ struct Node {
     std::vector<double> path_cumulative_weights;
     std::vector<const Node *> path_parents;
     std::vector<double> path_log_probs;
+    bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 

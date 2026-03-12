@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <print>
+#include <unordered_set>
 
 namespace libpts::treeviz {
 
@@ -34,6 +35,11 @@ struct Color {
 };
 
 constexpr Color CLEAR_COLOR{.r = 0.1f, .g = 0.1f, .b = 0.12f, .a = 1.0f};
+constexpr ImU32 EDGE_COLOR_DEFAULT = IM_COL32(180, 180, 180, 255);
+constexpr ImU32 EDGE_COLOR_SOLUTION = IM_COL32(120, 220, 160, 255);
+constexpr ImU32 NODE_COLOR_DEFAULT = IM_COL32(100, 180, 255, 255);
+constexpr ImU32 NODE_COLOR_SOLUTION = IM_COL32(90, 200, 140, 255);
+constexpr ImU32 NODE_COLOR_SELECTED = IM_COL32(255, 200, 0, 255);
 
 // Internal renderable node with layout positions
 struct VisualNode {
@@ -41,6 +47,7 @@ struct VisualNode {
     std::optional<int> parent_id;
     int action_taken;
     std::string label;
+    bool is_solution = false;
     std::size_t source_index;
     float x = 0.0f;
     float y = 0.0f;
@@ -87,6 +94,8 @@ auto compute_prepared_tree_fingerprint(const PreparedTree &prepared) -> uint64_t
     for (const auto &n : prepared.nodes) {
         detail::hash_combine(fp, static_cast<std::uint64_t>(n.id));
         detail::hash_combine(fp, n.parent_id ? static_cast<std::uint64_t>(*n.parent_id) : 0);
+        detail::hash_combine(fp, static_cast<std::uint64_t>(n.action_taken));
+        detail::hash_combine(fp, static_cast<std::uint64_t>(n.is_solution));
     }
 
     return fp;
@@ -275,6 +284,7 @@ struct TreeViewer::Impl {
                 .parent_id = n.parent_id,
                 .action_taken = n.action_taken,
                 .label = n.label,
+                .is_solution = n.is_solution,
                 .source_index = n.source_index
                 }
             );
@@ -310,7 +320,7 @@ struct TreeViewer::Impl {
         layout_nodes.reserve(visual_tree.nodes.size());
 
         for (const auto &node : visual_tree.nodes) {
-            layout_nodes.push_back(detail::LayoutInputNode{.id = node.id, .parent_id = node.parent_id});
+            layout_nodes.push_back(detail::LayoutInputNode{node.id, node.parent_id, node.action_taken});
         }
 
         // Compute or reuse cached layout positions
@@ -323,6 +333,7 @@ struct TreeViewer::Impl {
             node.x = cached_pos.x;
             node.y = cached_pos.y;
         }
+        rebuild_solution_paths(visual_tree);
         visual_tree_cache.tree = std::move(visual_tree);
     }
 
@@ -407,6 +418,7 @@ struct TreeViewer::Impl {
             visual_tree_cache.clear();
             selected_id.reset();
             clear_cached_image();
+            solution_path_ids.clear();
             pan = {0.0f, 0.0f};
             zoom = 1.0f;
         }
@@ -463,7 +475,9 @@ struct TreeViewer::Impl {
             const auto &c = visual_tree.nodes[child_i];
             ImVec2 p0 = to_screen(p.x, p.y);
             ImVec2 p1 = to_screen(c.x, c.y);
-            draw_list->AddLine(p0, p1, IM_COL32(180, 180, 180, 255), 2.0f);
+            const bool is_solution_edge = solution_path_ids.contains(p.id) && solution_path_ids.contains(c.id);
+            const ImU32 edge_color = is_solution_edge ? EDGE_COLOR_SOLUTION : EDGE_COLOR_DEFAULT;
+            draw_list->AddLine(p0, p1, edge_color, 2.0f);
             // draw the actione dge label
             if (zoom >= 0.4) {
                 // Midpoint of the edge.
@@ -507,8 +521,10 @@ struct TreeViewer::Impl {
             ImVec2 p = to_screen(node.x, node.y);
             float r = 20.0f * zoom;
 
-            ImU32 color =
-                (selected_id && *selected_id == node.id) ? IM_COL32(255, 200, 0, 255) : IM_COL32(100, 180, 255, 255);
+            ImU32 color = node.is_solution ? NODE_COLOR_SOLUTION : NODE_COLOR_DEFAULT;
+            if (selected_id && *selected_id == node.id) {
+                color = NODE_COLOR_SELECTED;
+            }
 
             draw_list->AddCircleFilled(p, r, color, 24);
             if (zoom >= 0.25) {
@@ -637,6 +653,36 @@ struct TreeViewer::Impl {
         image_texture.height = 0;
     }
 
+    void rebuild_solution_paths(const VisualTree &visual_tree)
+    {
+        solution_path_ids.clear();
+
+        for (const auto &node : visual_tree.nodes) {
+            if (!node.is_solution) {
+                continue;
+            }
+
+            std::optional<int> current_id = node.id;
+            std::unordered_set<int> visited;
+            while (current_id) {
+                const int id = *current_id;
+                if (visited.contains(id)) {
+                    break;
+                }
+                visited.insert(id);
+                solution_path_ids.insert(id);
+
+                const auto it = visual_tree.index_by_id.find(id);
+                if (it == visual_tree.index_by_id.end()) {
+                    break;
+                }
+
+                const auto &current = visual_tree.nodes[it->second];
+                current_id = current.parent_id;
+            }
+        }
+    }
+
     ViewerConfig viewer_config;
     TreeLayoutConfig tree_config;
 
@@ -656,6 +702,7 @@ struct TreeViewer::Impl {
     ImageTexture image_texture;
     ImageData cached_image;
     std::optional<std::size_t> cached_image_source_index;
+    std::unordered_set<int> solution_path_ids;
 
     int step_amount = 0;
     bool is_reset_clicked = false;

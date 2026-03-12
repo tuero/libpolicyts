@@ -26,6 +26,7 @@ auto compute_layout_fingerprint(std::span<const LayoutInputNode> nodes) -> uint6
     for (const auto &node : nodes) {
         hash_combine(fp, static_cast<uint64_t>(node.id));
         hash_combine(fp, node.parent_id ? static_cast<uint64_t>(*node.parent_id) : 0);
+        hash_combine(fp, static_cast<uint64_t>(node.action_taken));
     }
 
     return fp;
@@ -89,6 +90,17 @@ void compute_tree_layout(std::span<const LayoutInputNode> nodes, TreeLayoutCache
             spdlog::error(error_msg);
             throw std::runtime_error(error_msg);
         }
+    }
+
+    for (auto &children : children_by_index) {
+        std::sort(children.begin(), children.end(), [&](std::size_t lhs, std::size_t rhs) {
+            const auto &lhs_node = nodes[lhs];
+            const auto &rhs_node = nodes[rhs];
+            if (lhs_node.action_taken != rhs_node.action_taken) {
+                return lhs_node.action_taken < rhs_node.action_taken;
+            }
+            return lhs_node.id < rhs_node.id;
+        });
     }
 
     // Ensure a root was found

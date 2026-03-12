@@ -17,6 +17,7 @@ namespace libpts::treeviz::detail {
 struct LayoutInputNode {
     int id{};
     std::optional<int> parent_id;
+    int action_taken = 0;
 };
 
 // Output position in logical tree space.

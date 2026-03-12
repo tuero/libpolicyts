@@ -103,9 +103,10 @@ concept TreeNodeAdapter = requires(const Adapter &a, const Node &n) {
     { a.parent_id(n) } -> std::same_as<std::optional<int>>;
     { a.action_taken(n) } -> std::same_as<int>;
     { a.label(n) } -> std::convertible_to<std::string>;
+    { a.is_solution(n) } -> std::same_as<bool>;
     // If no image support, return an empty pixel array
     { a.image_shape(n) } -> std::same_as<std::pair<int, int>>;        // (H,W) in pixel count
-    { a.get_image(n) } -> std::same_as<std::vector<std::uint8_t>>;    // Flat RBG pixel vector (H*W*3)
+    { a.get_image(n) } -> std::same_as<std::vector<std::uint8_t>>;    // Flat RGB pixel vector (H*W*3)
 };
 
 struct PreparedNode {
@@ -113,6 +114,7 @@ struct PreparedNode {
     std::optional<int> parent_id;
     int action_taken;
     std::string label;
+    bool is_solution;
     std::size_t source_index;
     std::optional<std::size_t> parent_index;
 };
@@ -189,6 +191,7 @@ public:
                 .parent_id = adapter.parent_id(n),
                 .action_taken = adapter.action_taken(n),
                 .label = adapter.label(n),
+                .is_solution = adapter.is_solution(n),
                 .source_index = static_cast<std::size_t>(i),
                 .parent_index = parent_id.and_then([&](int par_id) -> std::optional<std::size_t> {
                     assert(id_to_index_map.contains(par_id));
