@@ -3,6 +3,7 @@
 
 #include <libpolicyts/tree_viz.h>
 
+#include "gif.h"
 #include "tree_layout.h"
 
 #define GL_SILENCE_DEPRECATION
@@ -40,6 +41,7 @@ constexpr ImU32 EDGE_COLOR_SOLUTION = IM_COL32(120, 220, 160, 255);
 constexpr ImU32 NODE_COLOR_DEFAULT = IM_COL32(100, 180, 255, 255);
 constexpr ImU32 NODE_COLOR_SOLUTION = IM_COL32(90, 200, 140, 255);
 constexpr ImU32 NODE_COLOR_SELECTED = IM_COL32(255, 200, 0, 255);
+constexpr int GIF_FRAME_DELAY = 5;
 
 // Internal renderable node with layout positions
 struct VisualNode {
@@ -320,7 +322,9 @@ struct TreeViewer::Impl {
         layout_nodes.reserve(visual_tree.nodes.size());
 
         for (const auto &node : visual_tree.nodes) {
-            layout_nodes.push_back(detail::LayoutInputNode{node.id, node.parent_id, node.action_taken});
+            layout_nodes.push_back(
+                detail::LayoutInputNode{.id = node.id, .parent_id = node.parent_id, .action_taken = node.action_taken}
+            );
         }
 
         // Compute or reuse cached layout positions
@@ -346,7 +350,7 @@ struct TreeViewer::Impl {
             return;
         }
 
-        // Structure changed, rebuild everything.
+        // Structure changed, rebuild everything
         build_visual_tree(prepared);
 
         visual_tree_cache.structure_fingerprint = structure_fp;
@@ -383,7 +387,7 @@ struct TreeViewer::Impl {
         ImGui::DockSpaceOverViewport(dockspace_id, viewport);
     }
 
-    void draw_tree_panel()
+    void draw_tree_panel(const ImageCallback &image_callback)
     {
         // NOLINTBEGIN(*-magic-numbers)
         ImGui::Begin("Tree");
@@ -427,6 +431,29 @@ struct TreeViewer::Impl {
             pan = {0.0f, 0.0f};
             zoom = 1.0f;
         }
+        ImGui::Separator();
+
+        ImGui::Text("GIF Export");    // NOLINT(*-type-vararg)
+        ImGui::Text("Start ID");      // NOLINT(*-type-vararg)
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::InputInt("##Start ID", &gif_start_id);
+        ImGui::SameLine();
+        ImGui::Text("End ID");    // NOLINT(*-type-vararg)
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::InputInt("##End ID", &gif_end_id);
+        ImGui::SameLine();
+        ImGui::Text("Delay");    // NOLINT(*-type-vararg)
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(120.0f);
+        ImGui::InputInt("##GIF Delay", &gif_frame_delay);
+        ImGui::SameLine();
+        if (ImGui::Button("Make GIF")) {
+            gif_status = make_gif(image_callback);
+        }
+        const char *status_text = gif_status.empty() ? " " : gif_status.c_str();
+        ImGui::TextUnformatted(status_text);
         ImGui::Separator();
 
         VisualTree &visual_tree = visual_tree_cache.tree;
@@ -653,6 +680,135 @@ struct TreeViewer::Impl {
         image_texture.height = 0;
     }
 
+    [[nodiscard]] auto make_gif(const ImageCallback &image_callback) -> std::string
+    {
+        VisualTree &visual_tree = visual_tree_cache.tree;
+        // Are start/end IDs valid
+        if (!visual_tree.index_by_id.contains(gif_start_id)) {
+            return std::format("Start ID {} not found.", gif_start_id);
+        }
+        if (!visual_tree.index_by_id.contains(gif_end_id)) {
+            return std::format("End ID {} not found.", gif_end_id);
+        }
+
+        std::vector<int> path_ids;
+        std::unordered_set<int> visited;
+        std::optional<int> current_id = gif_end_id;
+        bool found_start = false;
+
+        // Can we actually walk a path from start -> end
+        while (current_id) {
+            const int id = *current_id;
+            if (visited.contains(id)) {
+                return "Failed: cycle detected in parent chain.";
+            }
+            visited.insert(id);
+            path_ids.push_back(id);
+            if (id == gif_start_id) {
+                found_start = true;
+                break;
+            }
+
+            const auto it = visual_tree.index_by_id.find(id);
+            if (it == visual_tree.index_by_id.end()) {
+                return std::format("Failed: node {} not found in tree.", id);
+            }
+            current_id = visual_tree.nodes[it->second].parent_id;
+        }
+
+        if (!found_start) {
+            return "Failed: start ID not on end-to-root path.";
+        }
+
+        std::ranges::reverse(path_ids);
+
+        int gif_width = 0;
+        int gif_height = 0;
+        const int delay = std::max(0, gif_frame_delay);
+        GifWriter writer;
+        bool writer_open = false;
+        std::vector<std::uint8_t> rgba_frame;
+
+        // Found a path from start -> end, write each into the gif library
+        for (const int id : path_ids) {
+            const auto it = visual_tree.index_by_id.find(id);
+            if (it == visual_tree.index_by_id.end()) {
+                if (writer_open) {
+                    GifEnd(&writer);
+                }
+                return std::format("Failed: node {} not found in tree.", id);
+            }
+
+            const auto &node = visual_tree.nodes[it->second];
+            const ImageData image = image_callback(node.source_index);
+            const auto [img_height, img_width] = image.shape;
+            // Check image shapes, really this should always match but you never know
+            if (img_width <= 0 || img_height <= 0) {
+                if (writer_open) {
+                    GifEnd(&writer);
+                }
+                return std::format("Failed: invalid image shape for node {}.", id);
+            }
+
+            const std::size_t expected_size =
+                static_cast<std::size_t>(img_width) * static_cast<std::size_t>(img_height) * 3;
+            if (image.data.size() != expected_size) {
+                if (writer_open) {
+                    GifEnd(&writer);
+                }
+                return std::format("Failed: image size mismatch for node {}.", id);
+            }
+
+            if (!writer_open) {
+                gif_width = img_width;
+                gif_height = img_height;
+                if (!GifBegin(
+                        &writer,
+                        "path.gif",
+                        static_cast<uint32_t>(gif_width),
+                        static_cast<uint32_t>(gif_height),
+                        static_cast<uint32_t>(delay)
+                    ))
+                {
+                    return "Failed: unable to open path.gif for writing.";
+                }
+                writer_open = true;
+            } else if (img_width != gif_width || img_height != gif_height) {
+                GifEnd(&writer);
+                return "Failed: image size mismatch along path.";
+            }
+
+            rgba_frame.resize(static_cast<std::size_t>(gif_width) * static_cast<std::size_t>(gif_height) * 4);
+            for (std::size_t i = 0; i < static_cast<std::size_t>(gif_width) * static_cast<std::size_t>(gif_height); ++i)
+            {
+                const std::size_t src = i * 3;
+                const std::size_t dst = i * 4;
+                rgba_frame[dst] = image.data[src];
+                rgba_frame[dst + 1] = image.data[src + 1];
+                rgba_frame[dst + 2] = image.data[src + 2];
+                rgba_frame[dst + 3] = 255;    // NOLINT*(-magic-numbers)
+            }
+
+            if (!GifWriteFrame(
+                    &writer,
+                    rgba_frame.data(),
+                    static_cast<uint32_t>(gif_width),
+                    static_cast<uint32_t>(gif_height),
+                    static_cast<uint32_t>(delay)
+                ))
+            {
+                GifEnd(&writer);
+                return "Failed: error while writing GIF frame.";
+            }
+        }
+
+        if (writer_open) {
+            GifEnd(&writer);
+        }
+
+        return "GIF saved to path.gif.";
+    }
+
     void rebuild_solution_paths(const VisualTree &visual_tree)
     {
         solution_path_ids.clear();
@@ -704,6 +860,11 @@ struct TreeViewer::Impl {
     std::optional<std::size_t> cached_image_source_index;
     std::unordered_set<int> solution_path_ids;
 
+    int gif_start_id = 0;
+    int gif_end_id = 0;
+    int gif_frame_delay = GIF_FRAME_DELAY;
+    std::string gif_status;
+
     int step_amount = 0;
     bool is_reset_clicked = false;
 };
@@ -723,7 +884,7 @@ void TreeViewer::render_prepared(
     impl_->begin_frame();
 
     impl_->SetupDockspaceLayout();
-    impl_->draw_tree_panel();
+    impl_->draw_tree_panel(image_cb);
     impl_->draw_detail_panel(detail_callback, image_cb);
 
     impl_->end_frame();
