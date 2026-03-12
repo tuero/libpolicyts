@@ -52,14 +52,18 @@ void compute_tree_layout(std::span<const LayoutInputNode> nodes, TreeLayoutCache
     // Map node id -> input index
     std::unordered_map<int, std::size_t> index_by_id;
     index_by_id.reserve(nodes.size());
-    for (auto &&[i, node] : std::views::enumerate(nodes)) {
+    // for (auto &&[i, node] : std::views::enumerate(nodes)) {
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        const auto &node = nodes[i];
         index_by_id.emplace(node.id, i);
     }
 
     // Build child lists and determine root
     std::optional<std::size_t> root_index;
     std::vector<std::vector<std::size_t>> children_by_index(nodes.size());
-    for (auto &&[i, node] : std::views::enumerate(nodes)) {
+    // for (auto &&[i, node] : std::views::enumerate(nodes)) {
+    for (std::size_t i = 0; i < nodes.size(); ++i) {
+        const auto &node = nodes[i];
         // Find root and ensure only one root is ever found
         if (!node.parent_id) {
             if (root_index) {

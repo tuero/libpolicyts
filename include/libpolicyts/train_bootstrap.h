@@ -288,14 +288,22 @@ void train_bootstrap(
             --bootstrap_to_skip;
             continue;
         }
-        for (const auto &[batch_idx, batch_chunk] :
-             problems_train | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+        // for (const auto &[batch_idx, batch_chunk] :
+        //      problems_train | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+        for (std::size_t batch_idx = 0; batch_idx < problems_train.size();
+             batch_idx += static_cast<std::size_t>(num_problems_per_batch))
         {
-            decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
+            const auto chunk_begin = problems_train.begin() + static_cast<std::ptrdiff_t>(batch_idx);
+            const auto chunk_end =
+                problems_train.begin()
+                + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_problems_per_batch, problems_train.size()));
+            decltype(problems_train) batch(chunk_begin, chunk_end);
+            // decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
             spdlog::info(
                 "Iteration {:d}, Batch: {:d} of {:d}, CPU time: {:.2f}, Wall time: {:.2f}",
                 bootstrap_iter,
-                batch_idx,
+                // batch_idx,
+                batch_idx / num_problems_per_batch,
                 ceil_div(static_cast<int>(problems_train.size()), num_problems_per_batch),
                 timer_cpu.get_duration(),
                 timer_wall.get_duration()
@@ -406,10 +414,18 @@ void train_bootstrap(
 
         if (duration < time_budget) {
             spdlog::info("Running Validation Iteration");
-            for (const auto &[batch_idx, batch_chunk] :
-                 problems_validate | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+            // for (const auto &[batch_idx, batch_chunk] :
+            //      problems_validate | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+            for (std::size_t batch_idx = 0; batch_idx < problems_validate.size();
+                 batch_idx += static_cast<std::size_t>(num_problems_per_batch))
             {
-                decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
+                const auto chunk_begin = problems_validate.begin() + static_cast<std::ptrdiff_t>(batch_idx);
+                const auto chunk_end = problems_validate.begin()
+                                       + static_cast<std::ptrdiff_t>(
+                                           std::min(batch_idx + num_problems_per_batch, problems_validate.size())
+                                       );
+                decltype(problems_validate) batch(chunk_begin, chunk_end);
+                // decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
                 learner.preprocess(batch, false);
                 std::vector<SearchOutputT> results;
                 try {
@@ -430,8 +446,8 @@ void train_bootstrap(
                 for (const auto &result : results) {
                     if constexpr (std::is_same_v<ProblemMetricsTracker, MetricsTracker<ProblemMetrics>>) {
                         // We log path probabilities of solution, but we also have non-policy search algorithms
-                        // Thus, we need a way to check if a solution_prob is given by the search output, and if not,
-                        // insert a dummy value
+                        // Thus, we need a way to check if a solution_prob is given by the search output, and if
+                        // not, insert a dummy value
                         double solution_prob = [&]() -> double {
                             if constexpr (HasSolutionProb<SearchOutputT>) {
                                 return result.solution_prob;

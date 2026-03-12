@@ -126,10 +126,17 @@ void test_runner(
         std::vector<SearchInputT> unsolved_problems;
 
         // Shuffle training and iterate
-        for (const auto &[batch_idx, batch_chunk] :
-             outstanding_problems | std::views::chunk(num_threads) | std::views::enumerate)
+        // for (const auto &[batch_idx, batch_chunk] :
+        //      outstanding_problems | std::views::chunk(num_threads) | std::views::enumerate)
+        for (std::size_t batch_idx = 0; batch_idx < outstanding_problems.size();
+             batch_idx += static_cast<std::size_t>(num_threads))
         {
-            decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
+            const auto chunk_begin = outstanding_problems.begin() + static_cast<std::ptrdiff_t>(batch_idx);
+            const auto chunk_end =
+                outstanding_problems.begin()
+                + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_threads, outstanding_problems.size()));
+            decltype(problems) batch(chunk_begin, chunk_end);
+            // decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
             if (stop_token->stop_requested()) {
                 spdlog::info("Stop requested, exiting train batch loop");
                 break;

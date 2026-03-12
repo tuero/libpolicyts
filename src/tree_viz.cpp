@@ -5,6 +5,7 @@
 
 #include "tree_layout.h"
 
+#define GL_SILENCE_DEPRECATION
 #include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -17,8 +18,6 @@
 #include <print>
 
 namespace libpts::treeviz {
-
-#define GL_SILENCE_DEPRECATION
 
 namespace {
 void glfw_error_callback(int error, const char *description)
@@ -84,6 +83,44 @@ auto compute_prepared_tree_fingerprint(const PreparedTree &prepared) -> uint64_t
     }
 
     return fp;
+}
+
+// GL key checks
+auto IsKeyDown(GLFWwindow *window, int key) -> bool
+{
+    return glfwGetKey(window, key) == GLFW_PRESS;
+}
+
+auto IsSpaceDown(GLFWwindow *window) -> bool
+{
+    return IsKeyDown(window, GLFW_KEY_SPACE);
+}
+
+auto IsCommandDown(GLFWwindow *window) -> bool
+{
+    return IsKeyDown(window, GLFW_KEY_LEFT_SUPER) || IsKeyDown(window, GLFW_KEY_RIGHT_SUPER);
+}
+
+auto WantPanDrag(GLFWwindow *window) -> bool
+{
+    // Standard mouse users
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) {
+        return true;
+    }
+
+    // Cross-platform fallback that works well on laptops/trackpads
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) && IsSpaceDown(window)) {
+        return true;
+    }
+
+#if defined(__APPLE__)
+    // Optional Mac-specific fallback
+    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) && IsCommandDown(window)) {
+        return true;
+    }
+#endif
+
+    return false;
 }
 
 }    // namespace
@@ -233,12 +270,16 @@ struct TreeViewer::Impl {
             );
         }
 
-        for (auto &&[i, node] : std::views::enumerate(visual_tree.nodes)) {
+        // for (auto &&[i, node] : std::views::enumerate(visual_tree.nodes)) {
+        for (std::size_t i = 0; i < visual_tree.nodes.size(); ++i) {
+            auto &node = visual_tree.nodes[i];
             visual_tree.index_by_id.emplace(node.id, i);
         }
 
         // Set tree edges
-        for (auto &&[child_idx, child] : std::views::enumerate(visual_tree.nodes)) {
+        // for (auto &&[child_idx, child] : std::views::enumerate(visual_tree.nodes)) {
+        for (std::size_t child_idx = 0; child_idx < visual_tree.nodes.size(); ++child_idx) {
+            auto &child = visual_tree.nodes[child_idx];
             // Root is not a child of any node
             if (!child.parent_id) {
                 continue;
@@ -345,8 +386,17 @@ struct TreeViewer::Impl {
         }
         ImGui::SameLine();
         is_reset_clicked = false;
-        if (ImGui::Button("Reset")) {
+        if (ImGui::Button("Reset Tree")) {
             is_reset_clicked = true;
+            visual_tree_cache.clear();
+            selected_id.reset();
+            pan = {0.0f, 0.0f};
+            zoom = 1.0f;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reset View")) {
+            pan = {0.0f, 0.0f};
+            zoom = 1.0f;
         }
         ImGui::Separator();
 
@@ -377,7 +427,8 @@ struct TreeViewer::Impl {
             zoom = (next_zoom < 0.2f) ? 0.2f : (next_zoom > 4.0f ? 4.0f : next_zoom);
         }
 
-        if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Middle, 0.0f)) {
+        // Middle mouse button drag
+        if (active && WantPanDrag(window)) {
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
@@ -385,6 +436,9 @@ struct TreeViewer::Impl {
         auto to_screen = [&](float x, float y) -> ImVec2 {
             return {canvas_p0.x + pan.x + x * zoom, canvas_p0.y + pan.y + y * zoom};
         };
+
+        // Clip all drawings to the canvas box
+        draw_list->PushClipRect(canvas_p0, canvas_p1, true);
 
         // Draw edges first so they appear behind nodes.
         for (const auto &[parent_i, child_i, action] : visual_tree.edges) {
@@ -453,6 +507,7 @@ struct TreeViewer::Impl {
                 }
             }
         }
+        draw_list->PopClipRect();
 
         ImGui::End();
         // NOLINTEND(*-magic-numbers)
@@ -535,7 +590,6 @@ auto TreeViewer::step_amount() const -> int
 
 auto TreeViewer::reset_clicked() const -> bool
 {
-    impl_->visual_tree_cache.valid = false;
     return impl_->reset_clicked();
 }
 

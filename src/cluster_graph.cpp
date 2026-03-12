@@ -186,7 +186,9 @@ auto ClusterGraphs::sample_paths(
     auto c_level = static_cast<std::size_t>(cluster_level);
     igraph_t g = igraph_data->cluster_graphs[c_level];
     std::unordered_map<std::size_t, std::vector<std::size_t>> vertices_by_cluster;
-    for (const auto &[vid, cid] : std::views::enumerate(igraph_data->cluster_memberships.at(c_level))) {
+    // for (const auto &[vid, cid] : std::views::enumerate(igraph_data->cluster_memberships.at(c_level))) {
+    for (std::size_t vid = 0; vid < igraph_data->cluster_memberships.at(c_level).size(); ++vid) {
+        auto cid = igraph_data->cluster_memberships.at(c_level)[vid];
         vertices_by_cluster[cid].push_back(static_cast<std::size_t>(vid));
     }
 
