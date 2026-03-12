@@ -288,8 +288,13 @@ void train_bootstrap(
             --bootstrap_to_skip;
             continue;
         }
-        // for (const auto &[batch_idx, batch_chunk] :
-        //      problems_train | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+
+#ifdef __GLIBCXX__
+        for (const auto &[batch_idx, batch_chunk] :
+             problems_train | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+        {
+            decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
+#else
         for (std::size_t batch_idx = 0; batch_idx < problems_train.size();
              batch_idx += static_cast<std::size_t>(num_problems_per_batch))
         {
@@ -298,7 +303,7 @@ void train_bootstrap(
                 problems_train.begin()
                 + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_problems_per_batch, problems_train.size()));
             decltype(problems_train) batch(chunk_begin, chunk_end);
-            // decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
+#endif
             spdlog::info(
                 "Iteration {:d}, Batch: {:d} of {:d}, CPU time: {:.2f}, Wall time: {:.2f}",
                 bootstrap_iter,
@@ -414,8 +419,12 @@ void train_bootstrap(
 
         if (duration < time_budget) {
             spdlog::info("Running Validation Iteration");
-            // for (const auto &[batch_idx, batch_chunk] :
-            //      problems_validate | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+#ifdef __GLIBCXX__
+            for (const auto &[batch_idx, batch_chunk] :
+                 problems_validate | std::views::chunk(num_problems_per_batch) | std::views::enumerate)
+            {
+                decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
+#else
             for (std::size_t batch_idx = 0; batch_idx < problems_validate.size();
                  batch_idx += static_cast<std::size_t>(num_problems_per_batch))
             {
@@ -425,7 +434,7 @@ void train_bootstrap(
                                            std::min(batch_idx + num_problems_per_batch, problems_validate.size())
                                        );
                 decltype(problems_validate) batch(chunk_begin, chunk_end);
-                // decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
+#endif
                 learner.preprocess(batch, false);
                 std::vector<SearchOutputT> results;
                 try {

@@ -141,15 +141,21 @@ public:
         // ID to source index mapping
         std::unordered_map<int, std::size_t> id_to_index_map;
         id_to_index_map.reserve(nodes.size());
-        // for (auto &&[i, n] : std::views::enumerate(nodes)) {
+#ifdef __GLIBCXX__
+        for (auto &&[i, n] : std::views::enumerate(nodes)) {
+#else
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             auto &n = nodes[i];
+#endif
             id_to_index_map.emplace(adapter.id(n), i);
         }
 
-        // for (auto &&[i, n] : std::views::enumerate(nodes)) {
+#ifdef __GLIBCXX__
+        for (auto &&[i, n] : std::views::enumerate(nodes)) {
+#else
         for (std::size_t i = 0; i < nodes.size(); ++i) {
             auto &n = nodes[i];
+#endif
             const auto id = adapter.id(n);
             const auto parent_id = adapter.parent_id(n);
             assert(id_to_index_map.contains(id));

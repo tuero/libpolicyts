@@ -926,14 +926,17 @@ private:
         };
 
         // Indices along root -> node path that have non-zero weights i.e. the subtask decomposition
-        // auto decomposition_indices = node.path_weights | std::views::enumerate
-        //                              | std::views::filter([](auto &&x) -> bool { return std::get<1>(x) != 0; })
-        //                              | std::views::transform([](auto &&x) { return static_cast<int>(std::get<0>(x));
-        //                              }) | std::ranges::to<std::vector>();
+#ifdef __GLIBCXX__
+        auto decomposition_indices = node.path_weights | std::views::enumerate
+                                     | std::views::filter([](auto &&x) -> bool { return std::get<1>(x) != 0; })
+                                     | std::views::transform([](auto &&x) { return static_cast<int>(std::get<0>(x)); })
+                                     | std::ranges::to<std::vector>();
+#else
         auto decomposition_indices = std::views::iota(std::size_t{0}, node.path_weights.size())
                                      | std::views::filter([&](auto &&i) -> bool { return node.path_weights[i] != 0; })
                                      | std::views::transform([&](auto &&i) { return static_cast<int>(i); })
                                      | std::ranges::to<std::vector>();
+#endif
         // Guard against all zeros along path, so we get cost up to parent
         assert(decomposition_indices.size() > 0);
         if (decomposition_indices.size() == 1) {

@@ -270,16 +270,22 @@ struct TreeViewer::Impl {
             );
         }
 
-        // for (auto &&[i, node] : std::views::enumerate(visual_tree.nodes)) {
+#ifdef __GLIBCXX__
+        for (auto &&[i, node] : std::views::enumerate(visual_tree.nodes)) {
+#else
         for (std::size_t i = 0; i < visual_tree.nodes.size(); ++i) {
             auto &node = visual_tree.nodes[i];
+#endif
             visual_tree.index_by_id.emplace(node.id, i);
         }
 
         // Set tree edges
-        // for (auto &&[child_idx, child] : std::views::enumerate(visual_tree.nodes)) {
+#ifdef __GLIBCXX__
+        for (auto &&[child_idx, child] : std::views::enumerate(visual_tree.nodes)) {
+#else
         for (std::size_t child_idx = 0; child_idx < visual_tree.nodes.size(); ++child_idx) {
             auto &child = visual_tree.nodes[child_idx];
+#endif
             // Root is not a child of any node
             if (!child.parent_id) {
                 continue;

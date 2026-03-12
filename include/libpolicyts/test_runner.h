@@ -126,8 +126,12 @@ void test_runner(
         std::vector<SearchInputT> unsolved_problems;
 
         // Shuffle training and iterate
-        // for (const auto &[batch_idx, batch_chunk] :
-        //      outstanding_problems | std::views::chunk(num_threads) | std::views::enumerate)
+#ifdef __GLIBCXX__
+        for (const auto &[batch_idx, batch_chunk] :
+             outstanding_problems | std::views::chunk(num_threads) | std::views::enumerate)
+        {
+            decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
+#else
         for (std::size_t batch_idx = 0; batch_idx < outstanding_problems.size();
              batch_idx += static_cast<std::size_t>(num_threads))
         {
@@ -136,7 +140,7 @@ void test_runner(
                 outstanding_problems.begin()
                 + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_threads, outstanding_problems.size()));
             decltype(problems) batch(chunk_begin, chunk_end);
-            // decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
+#endif
             if (stop_token->stop_requested()) {
                 spdlog::info("Stop requested, exiting train batch loop");
                 break;

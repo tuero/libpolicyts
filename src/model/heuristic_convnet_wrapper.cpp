@@ -186,9 +186,12 @@ auto HeuristicConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> s
     // torch::from_blob requires a pointer to non-const and doesn't take ownership
     auto options = torch::TensorOptions().dtype(torch::kFloat);
     torch::Tensor input_observations = torch::empty({batch_size, input_flat_size}, options);
-    // for (auto &&[idx, batch_item] : std::views::enumerate(batch)) {
+#ifdef __GLIBCXX__
+    for (auto &&[idx, batch_item] : std::views::enumerate(batch)) {
+#else
     for (std::size_t idx = 0; idx < batch.size(); ++idx) {
         auto &batch_item = batch[idx];
+#endif
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
         assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options);
@@ -238,9 +241,12 @@ auto HeuristicConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     torch::Tensor input_observations = torch::empty({batch_size, input_flat_size}, options_float);
     torch::Tensor target_costs = torch::empty({batch_size, 1}, options_float);
 
-    // for (auto &&[idx, batch_item] : std::views::enumerate(batch)) {
+#ifdef __GLIBCXX__
+    for (auto &&[idx, batch_item] : std::views::enumerate(batch)) {
+#else
     for (std::size_t idx = 0; idx < batch.size(); ++idx) {
         auto &batch_item = batch[idx];
+#endif
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
         assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options_float);
