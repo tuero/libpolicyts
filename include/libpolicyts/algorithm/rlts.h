@@ -594,13 +594,18 @@ struct Node {
     Node(const EnvT &state_)
         : state(state_)
     {}
+    Node(const EnvT &_state, int _id)
+        : state(_state), id(_id)
+    {}
 
-    void apply_action(const Node<EnvT> *current, double c, int a)
+    void apply_action(const Node<EnvT> *par, double c, int a)
     {
-        parent = current;
+        assert(par);
+        parent = par;
+        parent_id = parent->id;
         state.apply_action(a);
-        double local_log_p = current->action_log_prob[static_cast<std::size_t>(a)];
-        log_p = current->log_p + local_log_p;
+        double local_log_p = parent->action_log_prob[static_cast<std::size_t>(a)];
+        log_p = parent->log_p + local_log_p;
         path_log_probs = parent->path_log_probs;
         path_log_probs.push_back(local_log_p);
 
@@ -611,8 +616,9 @@ struct Node {
 
         path_parents = parent->path_parents;
         path_parents.push_back(parent);
-        g = current->g + c;
+        g = parent->g + c;
         action = a;
+        is_solution = state.is_solution();
     }
 
     void set_cost(CostMode cost_mode)
@@ -657,13 +663,15 @@ struct Node {
     double cost = 0;
     const Node *parent = nullptr;
     int action = -1;
-    int id{};
+    int id = -1;
+    int parent_id = -1;
     mutable int expansion_number = -1;
     std::vector<double> action_log_prob;
     std::vector<double> path_weights;
     std::vector<double> path_cumulative_weights;
     std::vector<const Node *> path_parents;
     std::vector<double> path_log_probs;
+    bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 
@@ -699,14 +707,11 @@ public:
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
         }
 
-        const auto root_node_ptr = node_pool.emplace(input.state);
-        root_node_ptr->id = ++node_id_counter;
+        const auto root_node_ptr = node_pool.emplace(input.state, ++node_id_counter);
         generated_nodes.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
-
         rerooter.init(*root_node_ptr);
-
         status = Status::OK;
     }
 
@@ -727,6 +732,9 @@ public:
 
     void step()
     {
+        if (status != Status::OK) {
+            return;
+        }
         if (open.empty()) {
             status = Status::ERROR;
             spdlog::error("Exhausted open list - name: {:s}, budget: {:d}.", input.puzzle_name, input.search_budget);
@@ -734,11 +742,11 @@ public:
         }
 
         // Remove top node from open and put into closed
-        ++search_output.num_expanded;
         std::ranges::pop_heap(open, NodeCompareOrderedGreater{});
         const NodeT *current = open.back();
         open.pop_back();
         closed.insert(current);
+        ++search_output.num_expanded;
         current->expansion_number = search_output.num_expanded;
 
         rerooter.expanded(*current);
@@ -787,31 +795,31 @@ public:
                 continue;
             }
 
-            child.id = ++node_id_counter;
-
             // Store in block and get ptr back
-            auto child_node = node_pool.emplace(std::move(child));
-            generated_nodes.insert(child_node);
+            child.id = ++node_id_counter;
+            auto child_node_ptr = node_pool.emplace(std::move(child));
+            assert(child_node_ptr);
+            generated_nodes.insert(child_node_ptr);
 
-            rerooter.generated(*current, *child_node);
+            rerooter.generated(*current, *child_node_ptr);
 
             // Solution found, no optimality guarantees so we return on generation instead of expansion
-            if (child_node->state.is_solution()) {
+            if (child_node_ptr->state.is_solution()) {
                 spdlog::info(
                     "Solved - name: {:s}, exp: {:d}, gen: {:d}, budget: {:d}, c: {:.0f}",
                     input.puzzle_name,
                     search_output.num_expanded,
                     search_output.num_generated,
                     input.search_budget,
-                    child_node->g
+                    child_node_ptr->g
                 );
-                set_solution(*child_node);
+                set_solution(*child_node_ptr);
                 status = Status::SOLVED;
-                rerooter.solution_found(*child_node, generated_nodes);
+                rerooter.solution_found(*child_node_ptr, generated_nodes);
                 return;
             }
 
-            inference_nodes.push_back(child_node);
+            inference_nodes.push_back(child_node_ptr);
         }
 
         // Batch inference
@@ -834,10 +842,14 @@ public:
         return search_output;
     }
 
+    [[nodiscard]] auto get_tree() const -> std::vector<const NodeT *>
+    {
+        return generated_nodes | std::ranges::to<std::vector>();
+    }
+
     void run()
     {
-        TimerWall timer(-1);
-        timer.start();
+        reset();
         init();
         while (get_status() == Status::OK && !input.stop_token->stop_requested()) {
             step();
@@ -916,10 +928,17 @@ private:
         };
 
         // Indices along root -> node path that have non-zero weights i.e. the subtask decomposition
+#ifdef __GLIBCXX__
         auto decomposition_indices = node.path_weights | std::views::enumerate
                                      | std::views::filter([](auto &&x) -> bool { return std::get<1>(x) != 0; })
                                      | std::views::transform([](auto &&x) { return static_cast<int>(std::get<0>(x)); })
                                      | std::ranges::to<std::vector>();
+#else
+        auto decomposition_indices = std::views::iota(std::size_t{0}, node.path_weights.size())
+                                     | std::views::filter([&](auto &&i) -> bool { return node.path_weights[i] != 0; })
+                                     | std::views::transform([&](auto &&i) { return static_cast<int>(i); })
+                                     | std::ranges::to<std::vector>();
+#endif
         // Guard against all zeros along path, so we get cost up to parent
         assert(decomposition_indices.size() > 0);
         if (decomposition_indices.size() == 1) {

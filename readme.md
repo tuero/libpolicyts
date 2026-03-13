@@ -32,6 +32,7 @@ For full code examples, see `examples/`.
 - [PHS](docs/phs.md)
 - [Root-LTS](docs/rlts.md)
 - [Bootstrap Training and Testing](docs/bootstrap.md)
+- [Tree GUI](docs/gui.md)
 
 
 ## Implemented Environments
@@ -58,6 +59,10 @@ This can be enabled by setting the `LIBPOLICYTS_BUILD_TORCH` CMake flag, with li
 ## Auxiliary Utilities
 - Neural Network policy and heuristic functions through `libtorch` which are compatible with all implemented algorithms, which can be found in `include/libpolicyts/model/`
 - Training and Testing bootstrap functions which include threaded runners with neural network support
+- A tree viewer GUI using `ImGui`, which supports the included algorithms letting you step through to incrementally build the tree, view details for each node including the
+  image of the underlying state if supported, and can create GIFs of the state images along paths of the tree.
+
+![Tree Viewer](./docs/tree_viewer.png)
 
 
 ## CMake Flags

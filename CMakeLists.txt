@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.5.3 LANGUAGES CXX)
+project(libpolicyts VERSION 1.6.0 LANGUAGES CXX)
 
 
 # Build options
@@ -60,6 +60,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/thread_pool.h
     include/libpolicyts/timer.h
     include/libpolicyts/train_bootstrap.h
+    include/libpolicyts/tree_viz.h
     # Environment headers
     include/libpolicyts/env/boulderdash.h
     include/libpolicyts/env/craftworld.h
@@ -90,6 +91,8 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(igraph CONFIG REQUIRED)
 find_package(libleidenalg CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(OpenGL REQUIRED)
 
 
 # Link external libs
@@ -106,6 +109,8 @@ target_link_libraries(libpolicyts PUBLIC
 target_link_libraries(libpolicyts PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(libpolicyts PUBLIC igraph::igraph)
 target_link_libraries(libpolicyts PUBLIC libleidenalg::libleidenalg)
+target_link_libraries(libpolicyts PUBLIC imgui::imgui)
+target_link_libraries(libpolicyts PUBLIC OpenGL::GL)
 
 
 if (LIBPOLICYTS_BUILD_EXAMPLES)

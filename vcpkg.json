@@ -8,6 +8,15 @@
     "nlohmann-json",
     "sokoban",
     "spdlog",
-    "tsp"
+    "tsp",
+    {
+      "name": "imgui",
+      "default-features": false,
+      "features": [
+        "glfw-binding",
+        "opengl3-binding",
+        "docking-experimental"
+      ]
+    }
   ]
 }

@@ -190,7 +190,12 @@ auto PolicyConvNetWrapper::inference(std::vector<InferenceInput> &batch) -> std:
     // torch::from_blob requires a pointer to non-const and doesn't take ownership
     auto options = torch::TensorOptions().dtype(torch::kFloat);
     torch::Tensor input_observations = torch::empty({batch_size, input_flat_size}, options);
+#ifdef __GLIBCXX__
     for (const auto &[idx, batch_item] : std::views::enumerate(batch)) {
+#else
+    for (std::size_t idx = 0; idx < batch.size(); ++idx) {
+        auto &batch_item = batch[idx];
+#endif
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
         assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options);
@@ -257,7 +262,12 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     torch::Tensor target_actions = torch::empty({batch_size, 1}, options_long);
     torch::Tensor expandeds = torch::empty({batch_size, 1}, options_float);
 
+#ifdef __GLIBCXX__
     for (const auto &[idx, batch_item] : std::views::enumerate(batch)) {
+#else
+    for (std::size_t idx = 0; idx < batch.size(); ++idx) {
+        auto &batch_item = batch[idx];
+#endif
         const auto i = static_cast<int>(idx);    // stop torch from complaining about narrowing conversions
         assert(static_cast<int>(batch_item.observation.size()) == input_flat_size);
         input_observations[i] = torch::from_blob(batch_item.observation.data(), {input_flat_size}, options_float);
@@ -292,12 +302,12 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     return loss_value;
 }
 
-auto PolicyConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrdredDictMap
+auto PolicyConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"policy_convnet", model_->named_parameters(recurse)}};
 }
 
-auto PolicyConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrdredDictMap
+auto PolicyConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"policy_convnet", model_->named_buffers(recurse)}};
 }

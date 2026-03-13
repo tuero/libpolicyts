@@ -113,16 +113,21 @@ struct Node {
     Node(const EnvT &state_)
         : state(state_)
     {}
+    Node(const EnvT &state_, int _id)
+        : state(state_), id(_id)
+    {}
 
     // Apply action, set parent and costs
     void apply_action(const Node<EnvT> *par, int a)
     {
         assert(par);
         parent = par;
+        parent_id = par->id;
         auto c = state.apply_action(a);
         log_p = parent->log_p + parent->log_policy[static_cast<std::size_t>(a)];
         g = parent->g + c;
         action = a;
+        is_solution = state.is_solution();
     }
 
     struct Hasher {
@@ -176,6 +181,10 @@ struct Node {
     const Node *parent = nullptr;        // Parent node
     int action = INVALID_ACTION;         // Action taken from parent
     std::vector<double> log_policy{};    // Local log policy over child actions
+    int id = -1;
+    int parent_id = -1;
+    mutable int expansion_number = -1;
+    bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
 
@@ -200,7 +209,7 @@ class PHS {
     using NodeT = Node<EnvT>;
     using OpenListT =
         std::priority_queue<const NodeT *, std::vector<const NodeT *>, typename NodeT::CompareOrderedGreater>;
-    using ClosedListT = absl::flat_hash_set<const NodeT *, typename NodeT::Hasher, typename NodeT::CompareEqual>;
+    using NodeSet = absl::flat_hash_set<const NodeT *, typename NodeT::Hasher, typename NodeT::CompareEqual>;
 
 public:
     PHS(const SearchInput<EnvT, ModelT> &input_problem)
@@ -220,7 +229,7 @@ public:
             spdlog::error("Coroutine needs to be reset() before calling init()");
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
         }
-        const auto root_node_ptr = node_pool.emplace(input.state);
+        const auto root_node_ptr = node_pool.emplace(input.state, ++node_id_counter);
         generated_nodes.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
@@ -247,10 +256,14 @@ public:
         node_pool.clear();
         closed.clear();
         generated_nodes.clear();
+        node_id_counter = -1;
     }
 
     void step()
     {
+        if (status != Status::OK) {
+            return;
+        }
         if (open.empty()) {
             status = Status::ERROR;
             spdlog::error("Exhausted open list - name: {:s}, budget: {:d}.", input.puzzle_name, input.search_budget);
@@ -263,6 +276,7 @@ public:
         open.pop();
         closed.insert(current);
         ++search_output.num_expanded;
+        current->expansion_number = search_output.num_expanded;
 
         // Timeout
         if (input.search_budget >= 0 && search_output.num_expanded >= input.search_budget) {
@@ -299,6 +313,7 @@ public:
             }
 
             // Store in block and get ptr back
+            child.id = ++node_id_counter;
             auto child_node_ptr = node_pool.emplace(std::move(child));
             assert(child_node_ptr);
             generated_nodes.insert(child_node_ptr);
@@ -335,6 +350,20 @@ public:
     [[nodiscard]] auto get_search_output() const -> SearchOutput<EnvT>
     {
         return search_output;
+    }
+
+    [[nodiscard]] auto get_tree() const -> std::vector<const NodeT *>
+    {
+        return generated_nodes | std::ranges::to<std::vector>();
+    }
+
+    void run()
+    {
+        reset();
+        init();
+        while (get_status() == Status::OK && !input.stop_token->stop_requested()) {
+            step();
+        }
     }
 
 private:
@@ -413,12 +442,13 @@ private:
     SearchInput<EnvT, ModelT> input;         // Search input, containing problem instance, models, budget, etc.
     Status status{};                         // Current search status
     bool timeout = false;                    // Timeout flag on budget
+    int node_id_counter = -1;                // Node ID counter
     const std::shared_ptr<ModelT> model;     // Policy network with optional heuristic
     SearchOutput<EnvT> search_output;        // Output of the search algorithm, containing trajectory + stats
     std::vector<NodeT *> inference_nodes;    // Nodes in queue for batch inference
     OpenListT open;                          // Open list
-    ClosedListT closed;                      // Closed list
-    ClosedListT generated_nodes;             // Open + Closed list
+    NodeSet closed;                          // Closed list
+    NodeSet generated_nodes;                 // Open + Closed list
     StablePool<NodeT> node_pool;
 };
 

@@ -9,6 +9,8 @@ target_sources(libpolicyts
         resource.cpp
         signaller.cpp
         timer.cpp
+        tree_layout.cpp
+        tree_viz.cpp
 )
 
 # Conditionally add libtorch dependent source files

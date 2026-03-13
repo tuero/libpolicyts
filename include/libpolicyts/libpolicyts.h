@@ -18,6 +18,7 @@
 #include <libpolicyts/thread_pool.h>
 #include <libpolicyts/timer.h>
 #include <libpolicyts/train_bootstrap.h>
+#include <libpolicyts/tree_viz.h>
 
 // Environment headers
 #ifdef LIBPTS_ENVS_FOUND
