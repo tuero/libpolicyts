@@ -302,12 +302,12 @@ auto PolicyConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     return loss_value;
 }
 
-auto PolicyConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrdredDictMap
+auto PolicyConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"policy_convnet", model_->named_parameters(recurse)}};
 }
 
-auto PolicyConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrdredDictMap
+auto PolicyConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"policy_convnet", model_->named_buffers(recurse)}};
 }

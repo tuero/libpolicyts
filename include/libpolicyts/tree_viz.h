@@ -50,7 +50,7 @@ struct TreeLayoutConfig {
     float forest_gap_leaf_slots = 1.0f;
 };
 
-// User code add fields to the detail UI sidebar for any arbitrary type convertable to str
+// User code add fields to the detail UI sidebar for any arbitrary type convertible to str
 class DetailUI {
 public:
     /**
@@ -67,7 +67,7 @@ public:
     /**
      * Add a field to the node detail UI
      * @param name The name of the field
-     * @param value The value of the field, which must be convertable to string
+     * @param value The value of the field, which must be convertible to string
      */
     template <class T>
     void field(const std::string &name, const T &value)
@@ -96,7 +96,7 @@ private:
     }
 };
 
-// Pulls out relevant information from abitrary node types
+// Pulls out relevant information from arbitrary node types
 template <typename Adapter, typename Node>
 concept TreeNodeAdapter = requires(const Adapter &a, const Node &n) {
     { a.id(n) } -> std::convertible_to<int>;
@@ -104,7 +104,7 @@ concept TreeNodeAdapter = requires(const Adapter &a, const Node &n) {
     { a.action_taken(n) } -> std::same_as<int>;
     { a.label(n) } -> std::convertible_to<std::string>;
     { a.is_solution(n) } -> std::same_as<bool>;
-    // If no image support, return an empty pixel array
+    // If no image support, return an empty pixel vector
     { a.image_shape(n) } -> std::same_as<std::pair<int, int>>;        // (H,W) in pixel count
     { a.get_image(n) } -> std::same_as<std::vector<std::uint8_t>>;    // Flat RGB pixel vector (H*W*3)
 };

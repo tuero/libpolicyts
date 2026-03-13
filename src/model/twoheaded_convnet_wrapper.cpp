@@ -317,12 +317,12 @@ auto TwoHeadedConvNetWrapper::learn(std::vector<LearningInput> &batch) -> double
     return loss_value;
 }
 
-auto TwoHeadedConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrdredDictMap
+auto TwoHeadedConvNetWrapper::get_named_parameters(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"twoheaded_convnet", model_->named_parameters(recurse)}};
 }
 
-auto TwoHeadedConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrdredDictMap
+auto TwoHeadedConvNetWrapper::get_named_buffers(bool recurse) -> ModelTorchOrderedDictMap
 {
     return {{"twoheaded_convnet", model_->named_buffers(recurse)}};
 }

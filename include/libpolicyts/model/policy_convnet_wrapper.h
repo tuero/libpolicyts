@@ -107,12 +107,12 @@ public:
     /**
      * Get the model named parameters
      */
-    auto get_named_parameters(bool recurse = true) -> ModelTorchOrdredDictMap override;
+    auto get_named_parameters(bool recurse = true) -> ModelTorchOrderedDictMap override;
 
     /**
      * Get the model named buffers
      */
-    auto get_named_buffers(bool recurse = true) -> ModelTorchOrdredDictMap override;
+    auto get_named_buffers(bool recurse = true) -> ModelTorchOrderedDictMap override;
 
 protected:
     Config config;

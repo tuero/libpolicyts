@@ -93,17 +93,17 @@ public:
      */
     virtual void load_checkpoint_without_optimizer(const std::string &path) = 0;
 
-    using ModelTorchOrdredDictMap = std::unordered_map<std::string, torch::OrderedDict<std::string, torch::Tensor>>;
+    using ModelTorchOrderedDictMap = std::unordered_map<std::string, torch::OrderedDict<std::string, torch::Tensor>>;
 
     /**
      * Get the model named parameters
      */
-    virtual auto get_named_parameters(bool recurse = true) -> ModelTorchOrdredDictMap = 0;
+    virtual auto get_named_parameters(bool recurse = true) -> ModelTorchOrderedDictMap = 0;
 
     /**
      * Get the model named buffers
      */
-    virtual auto get_named_buffers(bool recurse = true) -> ModelTorchOrdredDictMap = 0;
+    virtual auto get_named_buffers(bool recurse = true) -> ModelTorchOrderedDictMap = 0;
 
 protected:
     std::string device_;
