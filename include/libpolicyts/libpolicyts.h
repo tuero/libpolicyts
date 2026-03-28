@@ -18,7 +18,11 @@
 #include <libpolicyts/thread_pool.h>
 #include <libpolicyts/timer.h>
 #include <libpolicyts/train_bootstrap.h>
+
+// UI dependent headers
+#ifdef LIBPTS_UI_FOUND
 #include <libpolicyts/tree_viz.h>
+#endif
 
 // Environment headers
 #ifdef LIBPTS_ENVS_FOUND

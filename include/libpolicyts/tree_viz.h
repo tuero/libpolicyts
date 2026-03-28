@@ -4,6 +4,10 @@
 #ifndef LIBPTS_TREE_VIZ_H_
 #define LIBPTS_TREE_VIZ_H_
 
+#ifndef LIBPTS_UI_FOUND
+#error "libpolicyts was built without UI support. Rebuild with UI support enabled."
+#endif
+
 #include <cassert>
 #include <concepts>
 #include <cstdint>

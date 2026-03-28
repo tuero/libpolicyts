@@ -645,9 +645,7 @@ struct Node {
                 }
                 std::unreachable();
             }();
-
-            // LTS rooted at root always has weight of 1
-            costs.push_back(log_cr_cost - std::log((i == 0 ? 1.0 : rooted_w) + EPS));
+            costs.push_back(log_cr_cost - std::log(rooted_w + EPS));
         }
 
         cost = std::ranges::min(costs);

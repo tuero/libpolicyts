@@ -1,5 +1,8 @@
 # Tree Viewer GUI
 
+To enable this feature, set the `LIBPOLICYTS_BUILD_UI` cmake variable to `ON` if building directly,
+or ensure you add with the `ui` feature if installing through vcpkg.
+
 The tree viewer provides a GUI to visually interact with search algorithms, where you can:
 - Incrementally build the search tree
 - Zoom/Pan the tree viewer (on MacOS, you can pan by holding space or command while dragging the mouse)
@@ -7,7 +10,8 @@ The tree viewer provides a GUI to visually interact with search algorithms, wher
 - Inspect details of each node, including a picture of the image of the represented state
 
 
-We use `ImGui` with `OpenGL/GLFW` backends. 
+We use `ImGui` with `OpenGL/GLFW` backends.
+`OpenGL` must be installed through your operating system package manager.
 
 A full example can be seen in `examples/bfs/bfs_tree_viz.cpp`.
 

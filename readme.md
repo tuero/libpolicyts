@@ -31,6 +31,7 @@ For full code examples, see `examples/`.
 - [LevinTS](docs/lts.md)
 - [PHS](docs/phs.md)
 - [Root-LTS](docs/rlts.md)
+- [Torch Model Wrappers](docs/model_wrapper.md)
 - [Bootstrap Training and Testing](docs/bootstrap.md)
 - [Tree GUI](docs/gui.md)
 
@@ -67,6 +68,7 @@ This can be enabled by setting the `LIBPOLICYTS_BUILD_TORCH` CMake flag, with li
 
 ## CMake Flags
 The following CMake flags are supported:
+- `LIBPOLICYTS_BUILD_UI`: Set to `ON` to build the tree UI backed by OpenGL
 - `LIBPOLICYTS_BUILD_ENVIRONMENTS`: Set to `ON` to build the environment wrappers
 - `LIBPOLICYTS_BUILD_EXAMPLES`: Set to `ON` to build the examples (implicitly enables `LIBPOLICYTS_BUILD_ENVIRONMENTS`)
 - `LIBPOLICYTS_BUILD_TORCH`: Set to `ON` to build neural models backed my libtorch
@@ -103,9 +105,10 @@ at the URL.
 
 To enable the Libtorch utilities, you can use the `torch` feature option when adding the library to vcpkg.
 To enable the provided environment wrappers, you can use the `environment` feature option when adding the library to vcpkg.
+To enable the provided tree UI, you can use the `ui` feature option when adding the library to vcpkg.
 ```shell
 vcpkg add port libpolicyts
-vcpkg add port libpolicyts[torch,environment]
+vcpkg add port libpolicyts[torch,environment,ui]
 ```
 
 Note that `torch` will look for the `libtorch` project in the environment variable `LIBTORCH_ROOT`, which is not part of the included dependencies.
@@ -121,6 +124,8 @@ Then set the `LIBTORCH_ROOT` environment variable:
 ```shell
 export LIBTORCH_ROOT=`python3 -c 'import torch;print(torch.utils.cmake_prefix_path)'`
 ```
+
+For OpenGL, you will need to ensure that it is installed through your operating system package manager.
 
 Then in your project cmake:
 ```cmake

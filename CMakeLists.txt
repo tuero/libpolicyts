@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(libpolicyts VERSION 1.6.0 LANGUAGES CXX)
+project(libpolicyts VERSION 1.7.0 LANGUAGES CXX)
 
 
 # Build options
 option(LIBPOLICYTS_BUILD_ENVIRONMENTS "Build libpolicyts environments" OFF)
 option(LIBPOLICYTS_BUILD_EXAMPLES "Build libpolicyts examples" OFF)
 option(LIBPOLICYTS_BUILD_TORCH "Build libpolicyts with libtorch models" OFF)
+option(LIBPOLICYTS_BUILD_UI "Build libpolicyts with OpenGL backed UI" OFF)
 
 # Let libpolicyts_SHARED_LIBS override BUILD_SHARED_LIBS
 if(DEFINED libpolicyts_SHARED_LIBS)
@@ -60,6 +61,7 @@ set(LIBPOLICYTS_PUBLIC_HEADERS
     include/libpolicyts/thread_pool.h
     include/libpolicyts/timer.h
     include/libpolicyts/train_bootstrap.h
+    # UI headers
     include/libpolicyts/tree_viz.h
     # Environment headers
     include/libpolicyts/env/boulderdash.h
@@ -85,17 +87,15 @@ set_source_files_properties(src/cluster_graph.cpp APPEND PROPERTIES
 )
 
 
-# External libs from 
+# External libs from vcpkg (unconditional)
 find_package(absl CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(igraph CONFIG REQUIRED)
 find_package(libleidenalg CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(OpenGL REQUIRED)
 
 
-# Link external libs
+# Link external libs (unconditional)
 target_link_libraries(libpolicyts PUBLIC spdlog::spdlog_header_only)
 target_link_libraries(libpolicyts PUBLIC 
     absl::base 
@@ -109,14 +109,36 @@ target_link_libraries(libpolicyts PUBLIC
 target_link_libraries(libpolicyts PUBLIC nlohmann_json::nlohmann_json)
 target_link_libraries(libpolicyts PUBLIC igraph::igraph)
 target_link_libraries(libpolicyts PUBLIC libleidenalg::libleidenalg)
-target_link_libraries(libpolicyts PUBLIC imgui::imgui)
-target_link_libraries(libpolicyts PUBLIC OpenGL::GL)
 
+# Conditional options
 
 if (LIBPOLICYTS_BUILD_EXAMPLES)
     message("LIBPOLICYTS_BUILD_EXAMPLES=ON requires environments to be built. Setting LIBPOLICYTS_BUILD_ENVIRONMENTS=ON")
     set(LIBPOLICYTS_BUILD_ENVIRONMENTS ON)
 endif()
+
+# External libs for OpenGL UI
+set(LIBPOLICYTS_BUILD_UI_SOURCES OFF)
+if(LIBPOLICYTS_BUILD_UI)
+    find_package(imgui CONFIG QUIET)
+    if(NOT ${imgui_FOUND})
+        message(FATAL_ERROR "LIBPOLICYTS_BUILD_UI=ON but imgui not found.")
+    endif()
+    find_package(OpenGL QUIET)
+    if(NOT ${OpenGL_FOUND})
+        message(FATAL_ERROR "LIBPOLICYTS_BUILD_UI=ON but OpenGL not found.")
+    endif()
+    message("Found UI dependencies, building UI support")
+    set(LIBPOLICYTS_BUILD_UI_SOURCES ON)
+    # Macro definition so source files can conditionally set interact with UI-dep files
+    target_compile_definitions(libpolicyts PUBLIC LIBPTS_UI_FOUND)
+
+    target_link_libraries(libpolicyts PUBLIC imgui::imgui)
+    target_link_libraries(libpolicyts PUBLIC OpenGL::GL)
+else()
+    message(WARNING "LIBPOLICYTS_BUILD_UI=OFF, skipping building UI")
+endif()
+
 
 # External libs for environments
 set(LIBPOLICYTS_BUILD_ENVIRONMENT_SOURCES OFF)
@@ -140,7 +162,7 @@ if(LIBPOLICYTS_BUILD_ENVIRONMENTS)
 
     message("Found environment dependencies, building environment wrappers")
     set(LIBPOLICYTS_BUILD_ENVIRONMENT_SOURCES ON)
-    # Macro definition so source files can conditionally set interact with torch-dep files
+    # Macro definition so source files can conditionally set interact with environment-dep files
     target_compile_definitions(libpolicyts PUBLIC LIBPTS_ENVS_FOUND)
 
     target_link_libraries(libpolicyts PUBLIC boulderdash::boulderdash)

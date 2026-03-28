@@ -9,9 +9,16 @@ target_sources(libpolicyts
         resource.cpp
         signaller.cpp
         timer.cpp
-        tree_layout.cpp
-        tree_viz.cpp
 )
+
+# Conditionally add UI dependent source files
+if(LIBPOLICYTS_BUILD_UI_SOURCES)
+target_sources(libpolicyts
+    PRIVATE 
+    tree_layout.cpp
+    tree_viz.cpp
+)
+endif()
 
 # Conditionally add libtorch dependent source files
 if(LIBPOLICYTS_BUILD_TORCH_SOURCES)
