@@ -7,6 +7,51 @@ This algorithm can make use of information LTS cannot, which can provide exponen
 $\sqrt{\mathrm{LTS}}$ needs as input a valid environment, model with both policy and heuristic evaluations,
 and a rerooter.
 
+## Cost Mode
+There are two cost modes which are supported
+```cpp
+enum class CostMode {
+    Slenderness,
+    DPi,
+};
+```
+
+### Slenderness
+This uses the slenderness cost function given in Orseau, Laurent, Marcus Hutter, and Levi HS Lelis. "Exponential Speedups by Rerooting Levin Tree Search." (2024).
+
+### DPi
+This uses the rerooted Levin cost.
+
+## Pruning Policies
+The search input has a `PruningPolicy` field to control the level of pruning:
+```cpp
+// How aggressive is the pruning
+enum class PruningPolicy {
+    None, 
+    Passive,  
+    Eager,
+};
+```
+
+### None
+No state-pruning is done, and solution check is performed at expansion.
+
+### Passive
+States are lazily pruned at expansion, and solution checks performed at expansion. 
+A node $n'$ is pruned if there is a previously expanded node $n$ representing the same underlying state which has a lower cost than $n'$, and every ancestor of $n'$ is *dominated* by some ancestor of $n$.
+
+For a node $n$ and an ancestor $a$, the **growth** is $\pi(a) / (w_a \pi(n))$, and the base is the cost of the node (either the $d/\pi$ cost or *slenderness* cost).
+An ancestor of $a'$ of $n'$ is dominated by an ancestor $a$ of $n$ if $\text{base}(n, a) \le \text{base}(n',a')$ and $\text{growth}(n, a) \le \text{growth}(n',a')$.
+
+> [!IMPORTANT]
+> This is an $O(N^2)$ check where $N$ is the depth of the node being considered.
+
+
+### Eager
+A state is pruned during generation if a node representing the same state has been previously generated, and solution checks are done at generation.
+
+
+
 ## Environment
 
 Environment objects need to support each of the following to satisfy the constraint

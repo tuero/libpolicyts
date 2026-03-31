@@ -10,7 +10,10 @@
 #include <libpolicyts/stop_token.h>
 #include <libpolicyts/timer.h>
 
+#include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
+#include <absl/flags/flag.h>
+#include <absl/strings/str_cat.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>
@@ -20,6 +23,7 @@
 #include <ranges>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 
 namespace libpts::algorithm::bfs {
 
@@ -50,6 +54,45 @@ concept IsBFSModel = requires(T t) {
         decltype(t.inference(makeval<std::vector<typename T::InferenceInput> &>()))>::value_type>;
 };
 
+// How aggressive is the pruning
+enum class PruningPolicy {
+    None = 0,       // None, solution check at expansion
+    Passive = 1,    // Prune if previously expanded, solution check at expansion
+    Eager = 2,      // Prune if previously generated, solution check at generation
+};
+
+// External flags -> enum support
+inline auto AbslParseFlag(absl::string_view text, PruningPolicy *prune_policy, std::string *error) -> bool
+{
+    if (text == "none") {
+        *prune_policy = PruningPolicy::None;
+        return true;
+    }
+    if (text == "passive") {
+        *prune_policy = PruningPolicy::Passive;
+        return true;
+    }
+    if (text == "eager") {
+        *prune_policy = PruningPolicy::Eager;
+        return true;
+    }
+    *error = "unknown value for enumeration";
+    return false;
+}
+
+inline auto AbslUnparseFlag(PruningPolicy prune_policy) -> std::string
+{
+    switch (prune_policy) {
+    case PruningPolicy::None:
+        return "none";
+    case PruningPolicy::Passive:
+        return "passive";
+    case PruningPolicy::Eager:
+        return "eager";
+    }
+    return absl::StrCat(prune_policy);
+}
+
 // Input to BFS search algorithm
 template <IsEnv EnvT, IsBFSModel ModelT>
 struct SearchInput {
@@ -59,6 +102,7 @@ struct SearchInput {
     int inference_batch_size = 1;
     double weight_g = 1;
     double weight_h = 0;
+    PruningPolicy prune_policy = PruningPolicy::Eager;
     std::shared_ptr<StopToken> stop_token;
     std::shared_ptr<ModelT> model;
 };
@@ -172,9 +216,18 @@ template <IsEnv EnvT, IsBFSModel ModelT>
 class BFS {
     using InferenceInputT = ModelT::InferenceInput;
     using NodeT = Node<EnvT>;
-    using OpenListT =
-        std::priority_queue<const NodeT *, std::vector<const NodeT *>, typename NodeT::CompareOrderedGreater>;
+    using NodeList = std::vector<const NodeT *>;
     using NodeSet = absl::flat_hash_set<const NodeT *, typename NodeT::Hasher, typename NodeT::CompareEqual>;
+    using NodePriorityQueue =
+        std::priority_queue<const NodeT *, std::vector<const NodeT *>, typename NodeT::CompareOrderedGreater>;
+    using NodeMultiSet = std::unordered_multiset<const NodeT *, typename NodeT::Hasher, typename NodeT::CompareEqual>;
+
+    struct NodeAndCost {
+        const NodeT *node;
+        double cost;
+    };
+    using PruneTable =
+        absl::flat_hash_map<const NodeT *, NodeAndCost, typename NodeT::Hasher, typename NodeT::CompareEqual>;
 
 public:
     BFS(const SearchInput<EnvT, ModelT> &input_problem)
@@ -202,7 +255,8 @@ public:
             throw std::logic_error("Coroutine needs to be reset() before calling init()");
         }
         const auto root_node_ptr = node_pool.emplace(input.state, ++node_id_counter);
-        generated_nodes.insert(root_node_ptr);
+        tree.push_back(root_node_ptr);
+        visited.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
         status = Status::OK;
@@ -219,8 +273,10 @@ public:
             std::swap(open, empty);
         }
         node_pool.clear();
+        visited.clear();
         closed.clear();
-        generated_nodes.clear();
+        tree.clear();
+        prune_table.clear();
         node_id_counter = -1;
     }
 
@@ -239,9 +295,45 @@ public:
         const auto current = open.top();
         assert(current);
         open.pop();
+
+        // If passive pruning, we need to check if this can be safely pruned
+        if (input.prune_policy == PruningPolicy::Passive) {
+            auto should_prune = [&]() -> bool {
+                if (closed.contains(current)) {
+                    return true;
+                }
+                // Check if this node is the lowest cost for the represented state
+                if (prune_table.at(current).node != current) {
+                    return true;
+                }
+                return false;
+            }();
+            if (should_prune) {
+                if (open.empty()) {    // Ensure we refill open if early breaking
+                    batch_predict();
+                }
+                return;
+            }
+        }
+
         closed.insert(current);
         ++search_output.num_expanded;
         current->expansion_number = search_output.num_expanded;
+
+        // Solution check for non-eager pruning
+        if (input.prune_policy != PruningPolicy::Eager && current->state.is_solution()) {
+            spdlog::info(
+                "Solved - name: {:s}, exp: {:d}, gen: {:d}, budget: {:d}, c: {:.0f}",
+                input.puzzle_name,
+                search_output.num_expanded,
+                search_output.num_generated,
+                input.search_budget,
+                current->g
+            );
+            set_solution_trajectory(*current);
+            status = Status::SOLVED;
+            return;
+        }
 
         // Timeout
         if (input.search_budget >= 0 && search_output.num_expanded >= input.search_budget) {
@@ -273,8 +365,8 @@ public:
                 continue;
             }
 
-            // Previously generated
-            if (generated_nodes.contains(&child)) {
+            // Under eager pruning, we skip previously visited nodes
+            if (input.prune_policy == PruningPolicy::Eager && visited.contains(&child)) {
                 continue;
             }
 
@@ -282,10 +374,12 @@ public:
             child.id = ++node_id_counter;
             auto child_node_ptr = node_pool.emplace(std::move(child));
             assert(child_node_ptr);
-            generated_nodes.insert(child_node_ptr);
+            tree.push_back(child_node_ptr);
+            visited.insert(child_node_ptr);
 
-            // Solution found, no optimality guarantees so we return on generation instead of expansion
-            if (child_node_ptr->state.is_solution()) {
+            // Solution found with aggressive prunung
+            // No optimality guarantees so we return on generation instead of expansion
+            if (input.prune_policy == PruningPolicy::Eager && child_node_ptr->state.is_solution()) {
                 spdlog::info(
                     "Solved - name: {:s}, exp: {:d}, gen: {:d}, budget: {:d}, c: {:.0f}",
                     input.puzzle_name,
@@ -320,7 +414,7 @@ public:
 
     [[nodiscard]] auto get_tree() const -> std::vector<const NodeT *>
     {
-        return generated_nodes | std::ranges::to<std::vector>();
+        return tree;
     }
 
     void run()
@@ -362,6 +456,10 @@ private:
             child_node->h = std::max(prediction.heuristic, 0.0);
             child_node->cost = (input.weight_g * child_node->g) + (input.weight_h * child_node->h);
             open.push(child_node);
+            // Book keep the min-cost seen for this state
+            if (!prune_table.contains(child_node) || child_node->cost < prune_table.at(child_node).cost) {
+                prune_table[child_node] = {child_node, child_node->cost};
+            }
             ++search_output.num_generated;
         }
         inference_nodes.clear();
@@ -395,9 +493,11 @@ private:
     const std::shared_ptr<ModelT> model;     // Policy network with optional heuristic
     SearchOutput<EnvT> search_output;        // Output of the search algorithm, containing trajectory + stats
     std::vector<NodeT *> inference_nodes;    // Nodes in queue for batch inference
-    OpenListT open;                          // Open list
-    NodeSet closed;                          // Closed list
-    NodeSet generated_nodes;                 // Open + Closed list
+    NodePriorityQueue open;                  // Open list
+    NodeMultiSet closed;                     // Closed list
+    NodeMultiSet visited;                    // Visited nodes (multiset version of full tree)
+    NodeList tree;                           // All nodes in the tree
+    PruneTable prune_table;                  // best node & cost for the given state
     StablePool<NodeT> node_pool;             // Stable storage + pointers for nodes
 };
 

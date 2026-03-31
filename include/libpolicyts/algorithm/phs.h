@@ -33,6 +33,9 @@ using SearchOutput = detail::SearchOutput<EnvT>;
 
 using Status = detail::Status;
 
+// How aggressive is the pruning
+using PruningPolicy = detail::PruningPolicy;
+
 // Coroutine-like stepable version
 template <IsEnv EnvT, IsPHSModel ModelT>
 using PHS = phs::detail::PHS<EnvT, ModelT>;

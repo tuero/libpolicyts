@@ -32,6 +32,9 @@ using SearchOutput = phs::detail::SearchOutput<EnvT>;
 
 using Status = phs::detail::Status;
 
+// How aggressive is the pruning
+using PruningPolicy = phs::detail::PruningPolicy;
+
 // Coroutine-like stepable version
 template <IsEnv EnvT, IsLTSModel ModelT>
 using LTS = phs::detail::PHS<EnvT, ModelT>;

@@ -125,76 +125,60 @@ void test_runner(
         }
         std::vector<SearchInputT> unsolved_problems;
 
-        // Shuffle training and iterate
-#ifdef __GLIBCXX__
-        for (const auto &[batch_idx, batch_chunk] :
-             outstanding_problems | std::views::chunk(num_threads) | std::views::enumerate)
-        {
-            decltype(problems) batch = batch_chunk | std::ranges::to<std::vector>();
-#else
-        for (std::size_t batch_idx = 0; batch_idx < outstanding_problems.size();
-             batch_idx += static_cast<std::size_t>(num_threads))
-        {
-            const auto chunk_begin = outstanding_problems.begin() + static_cast<std::ptrdiff_t>(batch_idx);
-            const auto chunk_end =
-                outstanding_problems.begin()
-                + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_threads, outstanding_problems.size()));
-            decltype(problems) batch(chunk_begin, chunk_end);
-#endif
-            if (stop_token->stop_requested()) {
-                spdlog::info("Stop requested, exiting train batch loop");
-                break;
-            }
-            std::vector<SearchOutputT> results;
-            try {
-                results = pool.run(algorithm, batch);
-            } catch (const std::exception &e) {
-                spdlog::error("ThreadPool run failed: {}", e.what());
-                throw;
-            } catch (...) {
-                spdlog::error("ThreadPool run failed with unknown exception.");
-                throw;
-            }
-            if (stop_token->stop_requested()) {
-                spdlog::info("Stop requested, exiting train batch loop");
-                break;
-            }
+        if (stop_token->stop_requested()) {
+            spdlog::info("Stop requested, exiting train batch loop");
+            break;
+        }
+        std::vector<SearchOutputT> results;
+        try {
+            // results = pool.run(algorithm, batch);
+            results = pool.run(algorithm, outstanding_problems);
+        } catch (const std::exception &e) {
+            spdlog::error("ThreadPool run failed: {}", e.what());
+            throw;
+        } catch (...) {
+            spdlog::error("ThreadPool run failed with unknown exception.");
+            throw;
+        }
+        if (stop_token->stop_requested()) {
+            spdlog::info("Stop requested, exiting train batch loop");
+            break;
+        }
 
-            for (auto &&[input_problem, result] : std::views::zip(batch, results)) {
-                if constexpr (std::is_same_v<ProblemMetricsTracker, MetricsTracker<ProblemMetrics>>) {
-                    // We log path probabilities of solution, but we also have non-policy search algorithms
-                    // Thus, we need a way to check if a solution_prob is given by the search output, and if not, insert
-                    // a dummy value
-                    double solution_prob = [&]() -> double {
-                        if constexpr (HasSolutionProb<SearchOutputT>) {
-                            return result.solution_prob;
-                        } else {
-                            return 0;
-                        }
-                    }();
-                    metrics_tracker.add_row(
-                        ProblemMetrics{
-                        .iter = bootstrap_iter,
-                        .puzzle_name = result.puzzle_name,
-                        .solution_found = result.solution_found,
-                        .solution_cost = result.solution_cost,
-                        .solution_prob = solution_prob,
-                        .expanded = result.num_expanded,
-                        .generated = result.num_generated,
-                        .time = result.time,
-                        .budget = search_budget
-                        }
-                    );
-                } else {
-                    metrics_tracker.add_row_by_result(result, bootstrap_iter, search_budget);
-                }
-                if (result.solution_found) {
-                    total_generated += result.num_generated;
-                    total_expansions += result.num_expanded;
-                    total_cost += result.solution_cost;
-                } else {
-                    unsolved_problems.push_back(input_problem);
-                }
+        for (auto &&[input_problem, result] : std::views::zip(outstanding_problems, results)) {
+            if constexpr (std::is_same_v<ProblemMetricsTracker, MetricsTracker<ProblemMetrics>>) {
+                // We log path probabilities of solution, but we also have non-policy search algorithms
+                // Thus, we need a way to check if a solution_prob is given by the search output, and if not, insert
+                // a dummy value
+                double solution_prob = [&]() -> double {
+                    if constexpr (HasSolutionProb<SearchOutputT>) {
+                        return result.solution_prob;
+                    } else {
+                        return 0;
+                    }
+                }();
+                metrics_tracker.add_row(
+                    ProblemMetrics{
+                    .iter = bootstrap_iter,
+                    .puzzle_name = result.puzzle_name,
+                    .solution_found = result.solution_found,
+                    .solution_cost = result.solution_cost,
+                    .solution_prob = solution_prob,
+                    .expanded = result.num_expanded,
+                    .generated = result.num_generated,
+                    .time = result.time,
+                    .budget = search_budget
+                    }
+                );
+            } else {
+                metrics_tracker.add_row_by_result(result, bootstrap_iter, search_budget);
+            }
+            if (result.solution_found) {
+                total_generated += result.num_generated;
+                total_expansions += result.num_expanded;
+                total_cost += result.solution_cost;
+            } else {
+                unsolved_problems.push_back(input_problem);
             }
         }
 

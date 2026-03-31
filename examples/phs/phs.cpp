@@ -52,6 +52,7 @@ int main()
         .search_budget = budget,
         .inference_batch_size = 1,
         .mix_epsilon = 0.0,
+        .prune_policy = phs::PruningPolicy::Eager,
         .stop_token = stop_token,
         .model = std::make_shared<SokobanPolicy>()
     };

@@ -155,7 +155,20 @@ struct NodeCompareOrderedGreater {
 };
 
 template <IsEnv EnvT>
-using NodeSet = absl::flat_hash_set<const Node<EnvT> *, NodeHasher, NodeCompareEqual>;
+using NodeList = std::vector<const Node<EnvT> *>;
+
+template <IsEnv EnvT>
+using NodeMultiSet = std::unordered_multiset<const Node<EnvT> *, NodeHasher, NodeCompareEqual>;
+
+template <IsEnv EnvT>
+struct TreeProxyView {
+    // NOLINTBEGIN(*-ref-data-members)
+    const NodeList<EnvT> &open;             // Nodes in the open list
+    const NodeMultiSet<EnvT> &closed;       // Nodes expanded
+    const NodeMultiSet<EnvT> &generated;    // Generated nodes
+    const NodeList<EnvT> &tree;             // All nodes in the tree
+    // NOLINTEND(*-ref-data-members)
+};
 
 // Concept which a rerooter must satisfy
 // This are the entry pointers which rerooters may want to use for internal state
@@ -164,20 +177,27 @@ using NodeSet = absl::flat_hash_set<const Node<EnvT> *, NodeHasher, NodeCompareE
 template <typename T, typename EnvT>
 concept IsRerooter =
     IsEnv<EnvT>
-    && requires(T t, const Node<EnvT> &node, const Node<EnvT> &child_node, const NodeSet<EnvT> &tree_nodes) {
-           { t.reset() };                             // Reset the rerooter state
-           { t.init(node) };                          // Initialize rerooter with root node
-           { t.expanded(node) };                      // Node was just expanded
-           { t.generated(node, child_node) };         // child_node was just generated from current node
-           { t.prev_generated(node, child_node) };    // child_node was previously generated and being pruned
-           { t(node) } -> std::same_as<double>;       // Get rerooting weight for this node
-           { t.batch_inferenced() };                  // Batch inference was just performed for policy
-           { t.solution_found(node, tree_nodes) };    // Solution found at the node, with access to all tree nodes
-       } && HasValidRerooterSearchOutput<T>;          // Optional .get_search_output() support
+    && requires(T t, const Node<EnvT> &node, const Node<EnvT> &child_node, const TreeProxyView<EnvT> &tree_view) {
+           { t.reset() };                                     // Reset the rerooter state
+           { t.init(node) };                                  // Initialize rerooter with root node
+           { t.expanded(node, tree_view) };                   // Node was just expanded
+           { t.visited(node, child_node, tree_view) };        // child_node visited but might not be generated
+           { t.generated(node, child_node, tree_view) };      // child_node was just generated from current node
+           { t(node, tree_view) } -> std::same_as<double>;    // Get rerooting weight for this node
+           { t.batch_inferenced(tree_view) };                 // Batch inference was just performed for policy
+           { t.solution_found(node, tree_view) };    // Solution found at the node, with access to all tree nodes
+       } && HasValidRerooterSearchOutput<T>;         // Optional .get_search_output() support
 
 enum class CostMode {
     Slenderness,
     DPi,
+};
+
+// How aggressive is the pruning
+enum class PruningPolicy {
+    None = 0,       // None, solution check at expansion
+    Passive = 1,    // Prune n' if c(n) <= c(n') && every anc of n domainates an anc of n', solution check at expansion
+    Eager = 2,      // Prune if previously generated, solution check at generation
 };
 
 // External flags -> enum support
@@ -206,6 +226,37 @@ inline auto AbslUnparseFlag(CostMode cost_mode) -> std::string
     return absl::StrCat(cost_mode);
 }
 
+inline auto AbslParseFlag(absl::string_view text, PruningPolicy *prune_policy, std::string *error) -> bool
+{
+    if (text == "none") {
+        *prune_policy = PruningPolicy::None;
+        return true;
+    }
+    if (text == "passive") {
+        *prune_policy = PruningPolicy::Passive;
+        return true;
+    }
+    if (text == "eager") {
+        *prune_policy = PruningPolicy::Eager;
+        return true;
+    }
+    *error = "unknown value for enumeration";
+    return false;
+}
+
+inline auto AbslUnparseFlag(PruningPolicy prune_policy) -> std::string
+{
+    switch (prune_policy) {
+    case PruningPolicy::None:
+        return "none";
+    case PruningPolicy::Passive:
+        return "passive";
+    case PruningPolicy::Eager:
+        return "eager";
+    }
+    return absl::StrCat(prune_policy);
+}
+
 // Input to PHS search algorithm
 template <IsEnv EnvT, IsRLTSModel ModelT, typename RerooterT>
     requires IsRerooter<RerooterT, EnvT>
@@ -217,6 +268,7 @@ struct SearchInput {
     int inference_batch_size{};
     double mix_epsilon{};
     CostMode cost_mode = CostMode::Slenderness;
+    PruningPolicy prune_policy = PruningPolicy::Eager;
     std::shared_ptr<StopToken> stop_token;
     std::shared_ptr<ModelT> model;
     RerooterT rerooter;
@@ -635,13 +687,13 @@ struct Node {
 
         std::vector<double> costs;
         costs.reserve(static_cast<std::size_t>(g));
-        for (auto &&[i, rooted_w] : std::views::zip(std::views::iota(static_cast<std::size_t>(0)), path_weights)) {
+        for (auto &&[i, rooted_w] : std::views::zip(std::views::iota(0), path_weights)) {
             double log_cr_cost = [&]() {
                 switch (cost_mode) {
                 case CostMode::Slenderness:
-                    return log_slenderness_cost_function(path_log_probs, static_cast<int>(i));
+                    return log_slenderness_cost_function(path_log_probs, i);
                 case CostMode::DPi:
-                    return log_d_pi_cost(path_log_probs, static_cast<int>(i));
+                    return log_d_pi_cost(path_log_probs, i);
                 }
                 std::unreachable();
             }();
@@ -681,18 +733,75 @@ enum class Status {
     SOLVED,
 };
 
+template <IsEnv EnvT>
+constexpr auto log_base_and_growth(const Node<EnvT> *node, int anc_idx, CostMode cost_mode) -> std::pair<double, double>
+{
+    assert(anc_idx >= 0 && anc_idx < static_cast<int>(node->path_parents.size()));
+    auto anc = node->path_parents[static_cast<std::size_t>(anc_idx)];
+    double log_growth = anc->log_p - std::log(anc->w) - node->log_p;
+    switch (cost_mode) {
+    case CostMode::DPi: {
+        double log_base = log_d_pi_cost(node->path_log_probs, anc_idx) - std::log(anc->w + EPS);
+        return {log_base, log_growth};
+    }
+    case CostMode::Slenderness:
+        double log_base = log_slenderness_cost_function(node->path_log_probs, anc_idx) - std::log(anc->w + EPS);
+        return {log_base, log_growth};
+    }
+    std::unreachable();
+}
+
+// Return true if ancestor from other dominates (is no worse) than ancestor from current
+template <IsEnv EnvT>
+constexpr auto ancestor_dominates(
+    const Node<EnvT> *current,
+    int current_anc_idx,
+    const Node<EnvT> *other,
+    int other_anc_idx,
+    CostMode cost_mode
+) -> bool
+{
+    auto &&[current_log_base, current_log_growth] = log_base_and_growth(current, current_anc_idx, cost_mode);
+    auto &&[other_log_base, other_log_growth] = log_base_and_growth(other, other_anc_idx, cost_mode);
+    return other_log_base <= current_log_base && other_log_growth <= current_log_growth;
+}
+
+// Return true if every ancestor of current node is dominated by some ancestor of other node
+template <IsEnv EnvT>
+constexpr auto is_dominated(const Node<EnvT> *current, const Node<EnvT> *other, CostMode cost_mode) -> bool
+{
+    for (const auto &current_anc_idx : std::views::iota(0, static_cast<int>(current->path_parents.size()))) {
+        bool covered = false;
+        for (const auto &other_anc_idx : std::views::iota(0, static_cast<int>(other->path_parents.size()))) {
+            if (ancestor_dominates(current, current_anc_idx, other, other_anc_idx, cost_mode)) {
+                covered = true;
+                break;
+            }
+        }
+        if (!covered) {
+            return false;    // couldn't find an ancestor of other that dominates, so we must keep
+        }
+    }
+    return true;
+}
+
 template <IsEnv EnvT, IsRLTSModel ModelT, typename RerooterT>
     requires IsRerooter<RerooterT, EnvT>
 class RLTS {
     using NodeT = Node<EnvT>;
     using InputT = ModelT::InferenceInput;
     using OutputT = ModelT::InferenceOutput;
-    using OpenListT = std::vector<const NodeT *>;
+    using NodeList = std::vector<const NodeT *>;
+    using NodeMultiSet = std::unordered_multiset<const NodeT *, NodeHasher, NodeCompareEqual>;
     using RerooterSearchOutputT = typename RerooterSearchOutputType<RerooterT>::type;
 
 public:
     RLTS(const SearchInput<EnvT, ModelT, RerooterT> &input_)
-        : input(input_), status(Status::INIT), model(input.model), rerooter(input.rerooter)
+        : input(input_),
+          status(Status::INIT),
+          model(input.model),
+          rerooter(input.rerooter),
+          tree_proxy{.open = open, .closed = closed, .generated = generated, .tree = tree}
     {
         reset();
     }
@@ -706,7 +815,8 @@ public:
         }
 
         const auto root_node_ptr = node_pool.emplace(input.state, ++node_id_counter);
-        generated_nodes.insert(root_node_ptr);
+        tree.push_back(root_node_ptr);
+        generated.insert(root_node_ptr);
         inference_nodes.push_back(root_node_ptr);
         batch_predict();
         rerooter.init(*root_node_ptr);
@@ -722,7 +832,9 @@ public:
         open.clear();
         node_pool.clear();
         closed.clear();
-        generated_nodes.clear();
+        generated.clear();
+        tree.clear();
+        prune_table.clear();
         node_id_counter = -1;
         cumulative_expansion_weights = 0;
         rerooter.reset();
@@ -743,18 +855,71 @@ public:
         std::ranges::pop_heap(open, NodeCompareOrderedGreater{});
         const NodeT *current = open.back();
         open.pop_back();
+
+        // If passive pruning, we need to check if this can be safely pruned
+        if (input.prune_policy == PruningPolicy::Passive) {
+            // Check if every ancestor of current is dominated by other
+            auto should_prune = [&](const NodeT *current_node, const NodeT *other_node) -> bool {
+                assert(current_node && other_node);
+                // If other has higher cost, it cannot dominate
+                if (current_node->cost < other_node->cost) {
+                    return false;
+                }
+                // No parents
+                if (current_node->path_parents.empty() || other_node->path_parents.empty()) {
+                    return false;
+                }
+                // True if every ancestor of current is dominated by some ancestor of other
+                return is_dominated(current_node, other_node, input.cost_mode);
+            };
+
+            auto &&[it_low, it_high] = prune_table.equal_range(current);
+            // Can any existing node prune the current node
+            for (const auto &other : std::ranges::subrange(it_low, it_high)) {
+                if (should_prune(current, other)) {
+                    if (open.empty()) {    // Ensure we refill open if early breaking
+                        batch_predict();
+                    }
+                    return;
+                }
+            }
+            // current node survives, remove entries in prune_table which current node dominates
+            auto kept_entries = std::ranges::subrange(it_low, it_high)
+                                | std::views::filter([&](auto &&other) { return !should_prune(other, current); })
+                                | std::ranges::to<std::vector>();
+            prune_table.erase(current);
+            prune_table.insert_range(kept_entries);
+            prune_table.insert(current);
+        }
+
         closed.insert(current);
         ++search_output.num_expanded;
         current->expansion_number = search_output.num_expanded;
 
-        rerooter.expanded(*current);
+        rerooter.expanded(*current, tree_proxy);
 
         // Set the weight for the current node, which children nodes will refer to for their cost
         // Ensure that the root always gets a weight of 1
-        current->w = rerooter(*current);
+        current->w = rerooter(*current, tree_proxy);
         current->w = current->parent ? current->w : 1.0;
         cumulative_expansion_weights += current->w;
         current->w_cumulative = cumulative_expansion_weights;
+
+        // Solution check for non-eager pruning
+        if (input.prune_policy != PruningPolicy::Eager && current->state.is_solution()) {
+            spdlog::info(
+                "Solved - name: {:s}, exp: {:d}, gen: {:d}, budget: {:d}, c: {:.0f}",
+                input.puzzle_name,
+                search_output.num_expanded,
+                search_output.num_generated,
+                input.search_budget,
+                current->g
+            );
+            set_solution(*current);
+            status = Status::SOLVED;
+            rerooter.solution_found(*current, tree_proxy);
+            return;
+        }
 
         // Timeout
         if (input.search_budget >= 0 && search_output.num_expanded >= input.search_budget) {
@@ -786,10 +951,12 @@ public:
                 continue;
             }
 
-            // Previously generated
-            if (generated_nodes.contains(&child)) {
-                auto prev_generated = generated_nodes.find(&child);
-                rerooter.prev_generated(*current, **prev_generated);
+            // Visiting node but might not be generating if we are eager skipping
+            rerooter.visited(*current, child, tree_proxy);
+
+            // Under eager pruning, we skip previously visited nodes
+            if (input.prune_policy == PruningPolicy::Eager && generated.contains(&child)) {
+                assert(generated.count(&child) == 1);
                 continue;
             }
 
@@ -797,12 +964,14 @@ public:
             child.id = ++node_id_counter;
             auto child_node_ptr = node_pool.emplace(std::move(child));
             assert(child_node_ptr);
-            generated_nodes.insert(child_node_ptr);
+            tree.push_back(child_node_ptr);
+            generated.insert(child_node_ptr);
 
-            rerooter.generated(*current, *child_node_ptr);
+            rerooter.generated(*current, *child_node_ptr, tree_proxy);
 
-            // Solution found, no optimality guarantees so we return on generation instead of expansion
-            if (child_node_ptr->state.is_solution()) {
+            // Solution found with aggressive prunung
+            // No optimality guarantees so we return on generation instead of expansion
+            if (input.prune_policy == PruningPolicy::Eager && child_node_ptr->state.is_solution()) {
                 spdlog::info(
                     "Solved - name: {:s}, exp: {:d}, gen: {:d}, budget: {:d}, c: {:.0f}",
                     input.puzzle_name,
@@ -813,7 +982,7 @@ public:
                 );
                 set_solution(*child_node_ptr);
                 status = Status::SOLVED;
-                rerooter.solution_found(*child_node_ptr, generated_nodes);
+                rerooter.solution_found(*child_node_ptr, tree_proxy);
                 return;
             }
 
@@ -842,7 +1011,7 @@ public:
 
     [[nodiscard]] auto get_tree() const -> std::vector<const NodeT *>
     {
-        return generated_nodes | std::ranges::to<std::vector>();
+        return tree;
     }
 
     void run()
@@ -880,7 +1049,7 @@ private:
             ++search_output.num_generated;
         }
 
-        rerooter.batch_inferenced();
+        rerooter.batch_inferenced(tree_proxy);
 
         // Heapify open
         std::ranges::make_heap(open, NodeCompareOrderedGreater{});
@@ -968,9 +1137,12 @@ private:
     RerooterT rerooter;
     SearchOutput<EnvT, RerooterSearchOutputT> search_output;    // Search output containing trajectory + stats
     std::vector<NodeT *> inference_nodes;                       // Nodes in queue for batch inference
-    OpenListT open;                                             // Open list
-    NodeSet<EnvT> closed;                                       // Closed list
-    NodeSet<EnvT> generated_nodes;                              // open + closed (used for duplication checks)
+    NodeList open;                                              // Open list
+    NodeMultiSet closed;                                        // Closed list
+    NodeMultiSet generated;                                     // Generated nodes
+    NodeList tree;                                              // All nodes in the tree
+    TreeProxyView<EnvT> tree_proxy;                             // proxy of open, closed, visited, tree
+    NodeMultiSet prune_table;                                   // Prune book keeping of non-dominated nodes per state
     double cumulative_expansion_weights = 0;                    // W_<t tracker
     StablePool<NodeT> node_pool;                                // Stable storage + pointers for nodes
 };

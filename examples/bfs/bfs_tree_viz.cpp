@@ -90,6 +90,7 @@ int main()
         .inference_batch_size = 1,
         .weight_g = 1.0,
         .weight_h = 1.0,
+        .prune_policy = bfs::PruningPolicy::Passive,
         .stop_token = stop_token,
         .model = std::make_shared<SokobanHeuristic>()
     };

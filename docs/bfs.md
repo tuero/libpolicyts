@@ -2,6 +2,27 @@
 
 Best First Search needs as input a valid environment and model with heuristic evaluations.
 
+## Pruning Policies
+The search input has a `PruningPolicy` field to control the level of pruning:
+```cpp
+// How aggressive is the pruning
+enum class PruningPolicy {
+    None, 
+    Passive,  
+    Eager,
+};
+```
+
+### None
+No state-pruning is done, and solution check is performed at expansion.
+
+### Passive
+States are lazily pruned at expansion, and solution checks performed at expansion. 
+A node is pruned $n'$ is pruned if there exists a node $n$ previously expanded with the same underlying state.
+
+### Eager
+A state is pruned during generation if a node representing the same state has been previously generated, and solution checks are done at generation.
+
 ## Environment
 
 Environment objects need to support each of the following to satisfy the constraint

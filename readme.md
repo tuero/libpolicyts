@@ -161,7 +161,7 @@ For example:
 ```shell
 export CC=gcc-15.2
 export CXX=g++-15.2
-export FC=gfortrain-15.2
+export FC=gfortran-15.2
 export LIBTORCH_ROOT=`python3 -c 'import torch;print(torch.utils.cmake_prefix_path)'`
 ```
 

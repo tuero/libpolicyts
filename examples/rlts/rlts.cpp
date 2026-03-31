@@ -33,22 +33,22 @@ struct PolicyAndHeuristic {
 namespace rlts = libpts::algorithm::rlts;
 using SokobanState = libpts::env::SokobanState;
 using NodeT = rlts::Node<SokobanState>;
-using NodeSet = rlts::NodeSet<SokobanState>;
+using TreeProxyView = rlts::TreeProxyView<SokobanState>;
 
 // Simple rerooter which produces 0 weights everywhere
 // The RLTS algorithm will ensure the root gets a weight of 1
 struct SokobanRerooter {
     void reset() {}
-    void init([[maybe_unused]] const NodeT &node) {}
-    void expanded([[maybe_unused]] const NodeT &node) {}
-    void generated([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeT &child_node) {}
-    void prev_generated([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeT &child_node) {}
-    auto operator()([[maybe_unused]] const NodeT &node) -> double
+    void init(const NodeT &) {}
+    void expanded(const NodeT &, const TreeProxyView &) {}
+    void visited(const NodeT &, const NodeT &, const TreeProxyView &) {}
+    void generated(const NodeT &, const NodeT &, const TreeProxyView &) {}
+    auto operator()(const NodeT &, const TreeProxyView &) -> double
     {
         return 0;
     }
-    void batch_inferenced() {}
-    void solution_found([[maybe_unused]] const NodeT &node, [[maybe_unused]] const NodeSet &tree_nodes) {}
+    void batch_inferenced(const TreeProxyView &) {}
+    void solution_found(const NodeT &, const TreeProxyView &) {}
 };
 
 using SokobanPolicy = PolicyAndHeuristic<SokobanState::num_actions>;
@@ -71,6 +71,7 @@ int main()
         .search_budget = budget,
         .inference_batch_size = 1,
         .mix_epsilon = 0.0,
+        .prune_policy = rlts::PruningPolicy::Eager,
         .stop_token = stop_token,
         .model = std::make_shared<SokobanPolicy>(),
         .rerooter = SokobanRerooter{}
