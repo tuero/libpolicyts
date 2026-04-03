@@ -108,11 +108,22 @@ The reooter has several endpoints which the algorithm will use as hooks, and you
 - `reset` called when the search algorithm instance is reset
 - `init` signals the search is initialized with the given root node
 - `expanded` signals the search has expanded the given node
+- `visited` signals the current node is visiting a child node before it may generate it (useful to internally track before the search prunes this child)
 - `generated` signals the current node has generated the child node
-- `prev_generated` signals the current node has previously generated a node representing the child node state
 - `batch_inferenced` signals that batch inference for policy evaluation was just performed
 - `solution_found` signals that the search found a solution at the given node
 - The function call operator for a given node should produce the rerooting weight for that node.
+
+The rerooter also gets access to a thin proxy wrapper of the state of the search:
+```cpp
+template <IsEnv EnvT>
+struct TreeProxyView {
+    const NodeList<EnvT> &open;             // Nodes in the open list
+    const NodeMultiSet<EnvT> &closed;       // Nodes expanded
+    const NodeMultiSet<EnvT> &generated;    // Generated nodes
+    const NodeList<EnvT> &tree;             // All nodes in the tree
+};
+```
 
 The rerooter can also internally track search statistics related to the weight values. 
 An typical use case is that you want to track the weights found along the solution path.
@@ -125,16 +136,16 @@ If you do not need this feature, then simply do not declare a `get_search_output
 template <typename T, typename EnvT>
 concept IsRerooter =
     IsEnv<EnvT>
-    && requires(T t, const T ct, const Node<EnvT> &node, const Node<EnvT> &current_node, const Node<EnvT> &child_node) {
+    && requires(T t, const Node<EnvT> &node, const Node<EnvT> &child_node, const TreeProxyView<EnvT> &tree_view) {
            { t.reset() };                                     // Reset the rerooter state
            { t.init(node) };                                  // Initialize rerooter with root node
-           { t.expanded(node) };                              // Node was just expanded
-           { t.generated(current_node, child_node) };         // child_node was just generated from current_node
-           { t.prev_generated(current_node, child_node) };    // child_node was previously generated and being pruned
-           { t(node) } -> std::same_as<double>;               // Get rerooting weight for this node
-           { t.batch_inferenced() };                          // Batch inference was just performed for policy
-           { t.solution_found(node) };                        // Solution found at the generated node
-       } && HasValidRerooterSearchOutput<T>;                  // Optional .get_search_output() support
+           { t.expanded(node, tree_view) };                   // Node was just expanded
+           { t.visited(node, child_node, tree_view) };        // child_node visited but might not be generated
+           { t.generated(node, child_node, tree_view) };      // child_node was just generated from current node
+           { t(node, tree_view) } -> std::same_as<double>;    // Get rerooting weight for this node
+           { t.batch_inferenced(tree_view) };                 // Batch inference was just performed for policy
+           { t.solution_found(node, tree_view) };    // Solution found at the node, with access to all tree nodes
+       } && HasValidRerooterSearchOutput<T>;         // Optional .get_search_output() support
 ```
 
 ## Example
@@ -171,15 +182,15 @@ struct PolicyAndHeuristic {
 // The RLTS algorithm will ensure the root gets a weight of 1
 struct Rerooter {
     void reset() {}
-    void init([[maybe_unused]] const NodeT &node) {}
-    void expanded([[maybe_unused]] const NodeT &node) {}
-    void generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
-    void prev_generated([[maybe_unused]] const NodeT &current_node, [[maybe_unused]] const NodeT &child_node) {}
-    auto operator()([[maybe_unused]] const NodeT &node) -> double {
+    void init(const NodeT &node) {}
+    void expanded(const NodeT &node, const TreeProxyView<EnvT> &tree_view) {}
+    void visited(const NodeT &current_node, const NodeT &child_node, const TreeProxyView<EnvT> &tree_view) {}
+    void generated(const NodeT &current_node, const NodeT &child_node, const TreeProxyView<EnvT> &tree_view) {}
+    auto operator()(const NodeT &node, const TreeProxyView<EnvT> &tree_view) -> double {
         return 0;
     }
-    void batch_inferenced() {}
-    void solution_found([[maybe_unused]] const NodeT &node) {}
+    void batch_inferenced(const TreeProxyView<EnvT> &tree_view) {}
+    void solution_found(const NodeT &node, const TreeProxyView<EnvT> &tree_view) {}
 };
 
 using State = ...
