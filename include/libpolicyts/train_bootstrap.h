@@ -295,20 +295,21 @@ void train_bootstrap(
         {
             decltype(problems_train) batch = batch_chunk | std::ranges::to<std::vector>();
 #else
-        for (std::size_t batch_idx = 0; batch_idx < problems_train.size();
-             batch_idx += static_cast<std::size_t>(num_problems_per_batch))
+        for (std::size_t batch_start_idx = 0; batch_start_idx < problems_train.size();
+             batch_start_idx += static_cast<std::size_t>(num_problems_per_batch))
         {
-            const auto chunk_begin = problems_train.begin() + static_cast<std::ptrdiff_t>(batch_idx);
-            const auto chunk_end =
-                problems_train.begin()
-                + static_cast<std::ptrdiff_t>(std::min(batch_idx + num_problems_per_batch, problems_train.size()));
+            const auto chunk_begin = problems_train.begin() + static_cast<std::ptrdiff_t>(batch_start_idx);
+            const auto chunk_end = problems_train.begin()
+                                   + static_cast<std::ptrdiff_t>(
+                                       std::min(batch_start_idx + num_problems_per_batch, problems_train.size())
+                                   );
             decltype(problems_train) batch(chunk_begin, chunk_end);
+            auto batch_idx = static_cast<int>(batch_start_idx) / num_problems_per_batch;
 #endif
             spdlog::info(
                 "Iteration {:d}, Batch: {:d} of {:d}, CPU time: {:.2f}, Wall time: {:.2f}",
                 bootstrap_iter,
-                // batch_idx,
-                batch_idx / num_problems_per_batch,
+                batch_idx,
                 ceil_div(static_cast<int>(problems_train.size()), num_problems_per_batch),
                 timer_cpu.get_duration(),
                 timer_wall.get_duration()
@@ -425,13 +426,13 @@ void train_bootstrap(
             {
                 decltype(problems_validate) batch = batch_chunk | std::ranges::to<std::vector>();
 #else
-            for (std::size_t batch_idx = 0; batch_idx < problems_validate.size();
-                 batch_idx += static_cast<std::size_t>(num_problems_per_batch))
+            for (std::size_t batch_start_idx = 0; batch_start_idx < problems_validate.size();
+                 batch_start_idx += static_cast<std::size_t>(num_problems_per_batch))
             {
-                const auto chunk_begin = problems_validate.begin() + static_cast<std::ptrdiff_t>(batch_idx);
+                const auto chunk_begin = problems_validate.begin() + static_cast<std::ptrdiff_t>(batch_start_idx);
                 const auto chunk_end = problems_validate.begin()
                                        + static_cast<std::ptrdiff_t>(
-                                           std::min(batch_idx + num_problems_per_batch, problems_validate.size())
+                                           std::min(batch_start_idx + num_problems_per_batch, problems_validate.size())
                                        );
                 decltype(problems_validate) batch(chunk_begin, chunk_end);
 #endif
