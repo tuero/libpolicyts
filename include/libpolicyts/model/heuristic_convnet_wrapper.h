@@ -14,6 +14,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <functional>
+
 namespace libpts::model {
 
 class HeuristicConvNetWrapper : public BaseModelWrapper {
@@ -108,6 +110,15 @@ public:
      * Get the model named buffers
      */
     auto get_named_buffers(bool recurse = true) -> ModelTorchOrderedDictMap override;
+
+    using ApplyFn = std::function<void(torch::nn::Module &)>;
+    /**
+     * Apply function to torch module
+     */
+    void apply(ApplyFn apply_fn)
+    {
+        model_->apply(apply_fn);
+    }
 
 protected:
     Config config;

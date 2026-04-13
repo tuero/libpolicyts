@@ -42,6 +42,7 @@ int main()
         ""
     );
     model->print();
+    model->apply(libpts::model::init_model);
 
     std::shared_ptr<libpts::StopToken> stop_token = libpts::signal_installer();
 
