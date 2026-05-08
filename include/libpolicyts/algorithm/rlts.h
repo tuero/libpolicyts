@@ -195,9 +195,8 @@ enum class CostMode {
 
 // How aggressive is the pruning
 enum class PruningPolicy {
-    None = 0,       // None, solution check at expansion
-    Passive = 1,    // Prune n' if c(n) <= c(n') && every anc of n domainates an anc of n', solution check at expansion
-    Eager = 2,      // Prune if previously generated, solution check at generation
+    None = 0,     // None, solution check at expansion
+    Eager = 1,    // Prune if previously generated, solution check at generation
 };
 
 // External flags -> enum support
@@ -232,10 +231,6 @@ inline auto AbslParseFlag(absl::string_view text, PruningPolicy *prune_policy, s
         *prune_policy = PruningPolicy::None;
         return true;
     }
-    if (text == "passive") {
-        *prune_policy = PruningPolicy::Passive;
-        return true;
-    }
     if (text == "eager") {
         *prune_policy = PruningPolicy::Eager;
         return true;
@@ -249,8 +244,6 @@ inline auto AbslUnparseFlag(PruningPolicy prune_policy) -> std::string
     switch (prune_policy) {
     case PruningPolicy::None:
         return "none";
-    case PruningPolicy::Passive:
-        return "passive";
     case PruningPolicy::Eager:
         return "eager";
     }
@@ -733,58 +726,6 @@ enum class Status {
     SOLVED,
 };
 
-template <IsEnv EnvT>
-constexpr auto log_base_and_growth(const Node<EnvT> *node, int anc_idx, CostMode cost_mode) -> std::pair<double, double>
-{
-    assert(anc_idx >= 0 && anc_idx < static_cast<int>(node->path_parents.size()));
-    auto anc = node->path_parents[static_cast<std::size_t>(anc_idx)];
-    double log_growth = anc->log_p - std::log(anc->w) - node->log_p;
-    switch (cost_mode) {
-    case CostMode::DPi: {
-        double log_base = log_d_pi_cost(node->path_log_probs, anc_idx) - std::log(anc->w + EPS);
-        return {log_base, log_growth};
-    }
-    case CostMode::Slenderness:
-        double log_base = log_slenderness_cost_function(node->path_log_probs, anc_idx) - std::log(anc->w + EPS);
-        return {log_base, log_growth};
-    }
-    std::unreachable();
-}
-
-// Return true if ancestor from other dominates (is no worse) than ancestor from current
-template <IsEnv EnvT>
-constexpr auto ancestor_dominates(
-    const Node<EnvT> *current,
-    int current_anc_idx,
-    const Node<EnvT> *other,
-    int other_anc_idx,
-    CostMode cost_mode
-) -> bool
-{
-    auto &&[current_log_base, current_log_growth] = log_base_and_growth(current, current_anc_idx, cost_mode);
-    auto &&[other_log_base, other_log_growth] = log_base_and_growth(other, other_anc_idx, cost_mode);
-    return other_log_base <= current_log_base && other_log_growth <= current_log_growth;
-}
-
-// Return true if every ancestor of current node is dominated by some ancestor of other node
-template <IsEnv EnvT>
-constexpr auto is_dominated(const Node<EnvT> *current, const Node<EnvT> *other, CostMode cost_mode) -> bool
-{
-    for (const auto &current_anc_idx : std::views::iota(0, static_cast<int>(current->path_parents.size()))) {
-        bool covered = false;
-        for (const auto &other_anc_idx : std::views::iota(0, static_cast<int>(other->path_parents.size()))) {
-            if (ancestor_dominates(current, current_anc_idx, other, other_anc_idx, cost_mode)) {
-                covered = true;
-                break;
-            }
-        }
-        if (!covered) {
-            return false;    // couldn't find an ancestor of other that dominates, so we must keep
-        }
-    }
-    return true;
-}
-
 template <IsEnv EnvT, IsRLTSModel ModelT, typename RerooterT>
     requires IsRerooter<RerooterT, EnvT>
 class RLTS {
@@ -834,7 +775,6 @@ public:
         closed.clear();
         generated.clear();
         tree.clear();
-        prune_table.clear();
         node_id_counter = -1;
         cumulative_expansion_weights = 0;
         rerooter.reset();
@@ -855,42 +795,6 @@ public:
         std::ranges::pop_heap(open, NodeCompareOrderedGreater{});
         const NodeT *current = open.back();
         open.pop_back();
-
-        // If passive pruning, we need to check if this can be safely pruned
-        if (input.prune_policy == PruningPolicy::Passive) {
-            // Check if every ancestor of current is dominated by other
-            auto should_prune = [&](const NodeT *current_node, const NodeT *other_node) -> bool {
-                assert(current_node && other_node);
-                // If other has higher cost, it cannot dominate
-                if (current_node->cost < other_node->cost) {
-                    return false;
-                }
-                // No parents
-                if (current_node->path_parents.empty() || other_node->path_parents.empty()) {
-                    return false;
-                }
-                // True if every ancestor of current is dominated by some ancestor of other
-                return is_dominated(current_node, other_node, input.cost_mode);
-            };
-
-            auto &&[it_low, it_high] = prune_table.equal_range(current);
-            // Can any existing node prune the current node
-            for (const auto &other : std::ranges::subrange(it_low, it_high)) {
-                if (should_prune(current, other)) {
-                    if (open.empty()) {    // Ensure we refill open if early breaking
-                        batch_predict();
-                    }
-                    return;
-                }
-            }
-            // current node survives, remove entries in prune_table which current node dominates
-            auto kept_entries = std::ranges::subrange(it_low, it_high)
-                                | std::views::filter([&](auto &&other) { return !should_prune(other, current); })
-                                | std::ranges::to<std::vector>();
-            prune_table.erase(current);
-            prune_table.insert_range(kept_entries);
-            prune_table.insert(current);
-        }
 
         closed.insert(current);
         ++search_output.num_expanded;
@@ -1142,7 +1046,6 @@ private:
     NodeMultiSet generated;                                     // Generated nodes
     NodeList tree;                                              // All nodes in the tree
     TreeProxyView<EnvT> tree_proxy;                             // proxy of open, closed, visited, tree
-    NodeMultiSet prune_table;                                   // Prune book keeping of non-dominated nodes per state
     double cumulative_expansion_weights = 0;                    // W_<t tracker
     StablePool<NodeT> node_pool;                                // Stable storage + pointers for nodes
 };
