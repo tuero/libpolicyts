@@ -148,12 +148,12 @@ target_link_libraries(main PRIVATE libpolicyts::libpolicyts)
 > If you still somehow see a CMake warning about an `RPATH` cycle involving `libtorch/libc10`
 > (often caused by vcpkg reusing an older cached build of a dependency and you aren't using the vcpkg registry triplet),
 > delete the build folder, and request to not reuse cached artifacts when configuring:
-> `VCPKG_BINARY_SOURCES=clear cmake --preset=debug-linux`
+> `VCPKG_BINARY_SOURCES=clear cmake --preset=release-linux`
 
 
 ## Building Examples
 The `CMakePrests.json` defines build options for the examples and libtorch neural models.
-You will first need to set the following environment variables for your `CC`, `CC`, and `FC` compiler.
+You will first need to set the following environment variables for your `CC`, `CXX`, and `FC` compiler.
 You will also need to set `LIBTORCH_ROOT` for the libtorch path.
 The easiest way for this is to install as a python package, then locate.
 
