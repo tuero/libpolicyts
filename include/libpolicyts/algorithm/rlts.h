@@ -673,6 +673,7 @@ struct Node {
         // Root base case
         if (parent == nullptr) {
             cost = 0;
+            rerooted_ancestor_idx = -1;
             return;
         }
 
@@ -693,7 +694,10 @@ struct Node {
             costs.push_back(log_cr_cost - std::log(rooted_w + EPS));
         }
 
-        cost = std::ranges::min(costs);
+        auto min_it = std::ranges::min_element(costs);
+        assert(min_it != costs.end());
+        rerooted_ancestor_idx = static_cast<int>(std::ranges::distance(costs.begin(), min_it));
+        cost = *min_it;
     }
 
     // NOLINTBEGIN (misc-non-private-member-variables-in-classes)
@@ -714,6 +718,7 @@ struct Node {
     std::vector<double> path_cumulative_weights;
     std::vector<const Node *> path_parents;
     std::vector<double> path_log_probs;
+    int rerooted_ancestor_idx = -1;
     bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
