@@ -12,7 +12,7 @@
     },
     {
       "kind": "git",
-      "baseline": "5e254a6e0e47ea39223a1d6425787fe2c5ef5233",
+      "baseline": "c3ac6f41d741551d3530523565b84444929268aa",
       "reference": "master",
       "repository": "https://github.com/tuero/vcpkg-registry",
       "packages": [

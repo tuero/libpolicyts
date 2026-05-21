@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 
 #include <array>
+#include <bitset>
 #include <functional>
 #include <sstream>
 #include <stdexcept>
@@ -123,6 +124,29 @@ public:
     [[nodiscard]] auto query_events(uint64_t events_mask) const noexcept -> bool
     {
         return (reward_signal & events_mask) > 0;
+    }
+
+    /**
+     * Get all indices of boxes
+     * @return vector of indicies
+     */
+    [[nodiscard]] auto get_box_indices() const noexcept -> std::vector<int>
+    {
+        return state.get_box_indices();
+    }
+
+    /**
+     * Get a bit pattern encoding the radius=1 tiling around the given index
+     * bits 0..3 encode if wall on N,E,S,W of idx
+     * bits 4..7 encode if box on N,E,S,W of idx
+     * bit  8 encodes if idx is on goal
+     * bit  9 encodes if idx is on box
+     * bit 10 encodes if idx is on agent
+     * @NOTE: This API is not stable
+     */
+    [[nodiscard]] auto get_neighbor_tiling_bits(int idx) const -> std::bitset<11>
+    {
+        return state.get_neighbor_tiling_bits(idx);
     }
 
     friend auto operator<<(std::ostream &os, const SokobanState &s) -> std::ostream &
