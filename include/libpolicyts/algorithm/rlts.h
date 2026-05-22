@@ -698,6 +698,7 @@ struct Node {
         assert(min_it != costs.end());
         rerooted_ancestor_idx = static_cast<int>(std::ranges::distance(costs.begin(), min_it));
         cost = *min_it;
+        path_log_costs = std::move(costs);
     }
 
     // NOLINTBEGIN (misc-non-private-member-variables-in-classes)
@@ -719,6 +720,7 @@ struct Node {
     std::vector<const Node *> path_parents;
     std::vector<double> path_log_probs;
     int rerooted_ancestor_idx = -1;
+    std::vector<double> path_log_costs;
     bool is_solution = false;
     // NOLINTEND (misc-non-private-member-variables-in-classes)
 };
