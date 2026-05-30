@@ -105,6 +105,13 @@ public:
         return state.get_hash();
     }
 
+    // Get 256-bit hash of state
+    using UInt256 = sokoban::Zobrist256;
+    [[nodiscard]] auto get_hash256() const noexcept -> UInt256
+    {
+        return state.get_hash256();
+    }
+
     // String representation of state
     [[nodiscard]] auto to_str() const noexcept -> std::string
     {
